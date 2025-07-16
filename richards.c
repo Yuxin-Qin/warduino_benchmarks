@@ -503,6 +503,9 @@ void start()
     int inner_iterations = 100;
 
     int result = 0;
+
+    init_mem_pool();
+    
     while (iterations > 0) {
         // unsigned long start = microseconds();
         result += inner_loop(inner_iterations);
