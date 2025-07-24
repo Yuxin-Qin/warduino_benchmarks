@@ -3,8 +3,7 @@
 /**************
  * Memory Allocator
  */
-#define CELL_SIZE 64
-
+#define CELL_SIZE 128  // Increased to avoid CHERI OOB
 typedef union {
   char bytes[CELL_SIZE];
   void *ptr;
@@ -12,9 +11,9 @@ typedef union {
 
 #define POOL_SIZE_IN_PAGES 2000
 #define PAGE_SIZE (1 << 12)
+#define TOTAL_CELLS ((POOL_SIZE_IN_PAGES * PAGE_SIZE) / CELL_SIZE)
 
 char mem[POOL_SIZE_IN_PAGES * PAGE_SIZE];
-
 void *pool = NULL;
 Cell *freelist = NULL;
 
@@ -32,6 +31,7 @@ void init_mem_pool() {
 }
 
 void *my_malloc(unsigned int num_bytes) {
+  if (num_bytes > CELL_SIZE - sizeof(void *)) return NULL;
   if (freelist == NULL) return NULL;
   void *p = (void *)freelist;
   freelist = freelist->ptr;
@@ -51,44 +51,44 @@ void my_free(void *ptr) {
 #define STEPS 1000
 
 typedef struct {
-  int x[3];  // position scaled by 1000
+  int x[3];  // scaled by 1000
   int v[3];  // velocity
   int mass;
 } Body;
 
-void zero_velocity(Body *bodies[NUM_BODIES]) {
+void zero_velocity(Body *bodies) {
   for (int k = 0; k < 3; ++k)
     for (int i = 1; i < NUM_BODIES; ++i)
-      bodies[0]->v[k] -= (bodies[i]->v[k] * bodies[i]->mass) / bodies[0]->mass;
+      bodies[0].v[k] -= (bodies[i].v[k] * bodies[i].mass) / bodies[0].mass;
 }
 
-void advance(Body *bodies[NUM_BODIES]) {
+void advance(Body *bodies) {
   for (int i = 0; i < NUM_BODIES; ++i) {
     for (int j = i + 1; j < NUM_BODIES; ++j) {
-      int dx = bodies[i]->x[0] - bodies[j]->x[0];
-      int dy = bodies[i]->x[1] - bodies[j]->x[1];
-      int dz = bodies[i]->x[2] - bodies[j]->x[2];
+      int dx = bodies[i].x[0] - bodies[j].x[0];
+      int dy = bodies[i].x[1] - bodies[j].x[1];
+      int dz = bodies[i].x[2] - bodies[j].x[2];
       int dist = dx * dx + dy * dy + dz * dz + 1;
 
-      int f = 1000 / dist;  // fake inverse-square law
+      int f = 1000 / dist;  // fake inverse-square
       for (int k = 0; k < 3; ++k) {
-        int dv = (bodies[j]->x[k] - bodies[i]->x[k]) * f;
-        bodies[i]->v[k] += dv * bodies[j]->mass / 10000;
-        bodies[j]->v[k] -= dv * bodies[i]->mass / 10000;
+        int dv = (bodies[j].x[k] - bodies[i].x[k]) * f;
+        bodies[i].v[k] += dv * bodies[j].mass / 10000;
+        bodies[j].v[k] -= dv * bodies[i].mass / 10000;
       }
     }
   }
 
   for (int i = 0; i < NUM_BODIES; ++i)
     for (int k = 0; k < 3; ++k)
-      bodies[i]->x[k] += bodies[i]->v[k];
+      bodies[i].x[k] += bodies[i].v[k];
 }
 
-void print_state(Body *bodies[NUM_BODIES]) {
+void print_state(Body *bodies) {
   for (int i = 0; i < NUM_BODIES; ++i) {
     print_string("Body "); print_int(i); print_string(": ");
     for (int k = 0; k < 3; ++k) {
-      print_int(bodies[i]->x[k]); print_string(" ");
+      print_int(bodies[i].x[k]); print_string(" ");
     }
     print_string("\n");
   }
@@ -102,15 +102,16 @@ void start() {
   init_mem_pool();
   print_string("2\n");
 
-  Body *bodies[NUM_BODIES];
-  for (int i = 0; i < NUM_BODIES; ++i) {
-    bodies[i] = (Body *)my_malloc(sizeof(Body));
+  Body *bodies = (Body *)my_malloc(sizeof(Body) * NUM_BODIES);
+  if (!bodies) {
+    print_string("malloc failed\n");
+    return;
   }
 
   // Simplified initial conditions (scaled by 1000)
-  *bodies[0] = (Body){{0, 0, 0}, {0, 0, 0}, 10000};
-  *bodies[1] = (Body){{1000, 0, 0}, {0, 2, 0}, 1};
-  *bodies[2] = (Body){{-1000, 0, 0}, {0, -2, 0}, 1};
+  bodies[0] = (Body){{0, 0, 0}, {0, 0, 0}, 10000};
+  bodies[1] = (Body){{1000, 0, 0}, {0, 2, 0}, 1};
+  bodies[2] = (Body){{-1000, 0, 0}, {0, -2, 0}, 1};
 
   zero_velocity(bodies);
   for (int i = 0; i < STEPS; ++i)
