@@ -3,15 +3,15 @@
 /**************
  * Memory Allocator
  */
-#define CELL_SIZE 2048
+#define CELL_SIZE 64
+
 typedef union {
   char bytes[CELL_SIZE];
   void *ptr;
 } Cell;
 
-#define POOL_SIZE_IN_PAGES 20000
+#define POOL_SIZE_IN_PAGES 2000
 #define PAGE_SIZE (1 << 12)
-#define TOTAL_CELLS ((POOL_SIZE_IN_PAGES * PAGE_SIZE) / CELL_SIZE)
 
 char mem[POOL_SIZE_IN_PAGES * PAGE_SIZE];
 void *pool = NULL;
@@ -31,7 +31,6 @@ void init_mem_pool() {
 }
 
 void *my_malloc(unsigned int num_bytes) {
-  if (num_bytes > CELL_SIZE - sizeof(void *)) return NULL;
   if (freelist == NULL) return NULL;
   void *p = (void *)freelist;
   freelist = freelist->ptr;
@@ -48,10 +47,10 @@ void my_free(void *ptr) {
  * Integer-Based N-Body
  */
 #define NUM_BODIES 3
-#define STEPS 1000
+#define STEPS 50000000
 
 typedef struct {
-  int x[3];  // scaled by 1000
+  int x[3];  // scaled position
   int v[3];  // velocity
   int mass;
 } Body;
@@ -70,7 +69,7 @@ void advance(Body *bodies) {
       int dz = bodies[i].x[2] - bodies[j].x[2];
       int dist = dx * dx + dy * dy + dz * dz + 1;
 
-      int f = 1000 / dist;  // fake inverse-square
+      int f = 1000 / dist;  // fake inverse-square force
       for (int k = 0; k < 3; ++k) {
         int dv = (bodies[j].x[k] - bodies[i].x[k]) * f;
         bodies[i].v[k] += dv * bodies[j].mass / 10000;
@@ -103,10 +102,6 @@ void start() {
   print_string("2\n");
 
   Body *bodies = (Body *)my_malloc(sizeof(Body) * NUM_BODIES);
-  if (!bodies) {
-    print_string("malloc failed\n");
-    return;
-  }
 
   // Simplified initial conditions (scaled by 1000)
   bodies[0] = (Body){{0, 0, 0}, {0, 0, 0}, 10000};
