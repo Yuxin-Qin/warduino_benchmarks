@@ -3,13 +3,13 @@
 /**************
  * Memory Allocator
  */
-#define CELL_SIZE 64
+#define CELL_SIZE 1024
 typedef union {
   char bytes[CELL_SIZE];
   void *ptr;
 } Cell;
 
-#define POOL_SIZE_IN_PAGES 2000
+#define POOL_SIZE_IN_PAGES 200000
 #define PAGE_SIZE (1 << 12)
 
 char mem[POOL_SIZE_IN_PAGES * PAGE_SIZE];
