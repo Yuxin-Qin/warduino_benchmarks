@@ -3,13 +3,13 @@
 /**************
  * Memory Allocator
  */
-#define CELL_SIZE 1024
+#define CELL_SIZE 64
 typedef union {
   char bytes[CELL_SIZE];
   void *ptr;
 } Cell;
 
-#define POOL_SIZE_IN_PAGES 200000
+#define POOL_SIZE_IN_PAGES 2000
 #define PAGE_SIZE (1 << 12)
 
 char mem[POOL_SIZE_IN_PAGES * PAGE_SIZE];
@@ -52,7 +52,7 @@ void print_nl() {
 /**************
  * Fannkuch Benchmark
  */
-#define N 7  // maximum N is 11 due to 64-bit factorial
+#define N 1  // maximum N is 11 due to 64-bit factorial
 #define FACTORIAL_SIZE (N+1)
 
 void start() {
