@@ -3,7 +3,7 @@
 /**************
  * Memory Allocator
  */
-#define CELL_SIZE 128  // Increased to avoid CHERI OOB
+#define CELL_SIZE 1024
 typedef union {
   char bytes[CELL_SIZE];
   void *ptr;
