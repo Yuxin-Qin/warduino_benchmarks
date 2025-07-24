@@ -52,7 +52,7 @@ void print_nl() {
 /**************
  * Fannkuch Benchmark
  */
-#define N 5  // maximum N is 11 due to 64-bit factorial
+#define N 3  // maximum N is 11 due to 64-bit factorial
 #define FACTORIAL_SIZE (N+1)
 
 void start() {
