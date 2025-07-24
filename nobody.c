@@ -1,9 +1,10 @@
 #define NULL 0
 
 /**************
- * Memory Allocator (Fixed-size Cell Pool)
+ * Memory Allocator
  */
 #define CELL_SIZE 64
+
 typedef union {
   char bytes[CELL_SIZE];
   void *ptr;
@@ -13,6 +14,7 @@ typedef union {
 #define PAGE_SIZE (1 << 12)
 
 char mem[POOL_SIZE_IN_PAGES * PAGE_SIZE];
+void *pool = NULL;
 Cell *freelist = NULL;
 
 void init_mem_pool() {
@@ -25,6 +27,7 @@ void init_mem_pool() {
   }
   cell->ptr = NULL;
   freelist = (Cell *)p;
+  pool = p;
 }
 
 void *my_malloc(unsigned int num_bytes) {
@@ -40,16 +43,14 @@ void my_free(void *ptr) {
   freelist = empty;
 }
 
-
 /**************
- * Fixed-Point N-Body Benchmark
+ * Integer-Based N-Body
  */
 #define NUM_BODIES 3
 #define STEPS 50000000
-#define FP_SCALE 1000
 
 typedef struct {
-  int x[3];  // position scaled by FP_SCALE
+  int x[3];  // scaled position
   int v[3];  // velocity
   int mass;
 } Body;
@@ -68,11 +69,11 @@ void advance(Body *bodies) {
       int dz = bodies[i].x[2] - bodies[j].x[2];
       int dist = dx * dx + dy * dy + dz * dz + 1;
 
-      int f = FP_SCALE / dist;  // fake inverse-square gravity
+      int f = 1000 / dist;  // fake inverse-square force
       for (int k = 0; k < 3; ++k) {
         int dv = (bodies[j].x[k] - bodies[i].x[k]) * f;
-        bodies[i].v[k] += dv * bodies[j].mass / (FP_SCALE * 10);
-        bodies[j].v[k] -= dv * bodies[i].mass / (FP_SCALE * 10);
+        bodies[i].v[k] += dv * bodies[j].mass / 10000;
+        bodies[j].v[k] -= dv * bodies[i].mass / 10000;
       }
     }
   }
@@ -92,29 +93,24 @@ void print_state(Body *bodies) {
   }
 }
 
-
 /**************
  * Benchmark Entrypoint
  */
 void start() {
-  print_string("N-Body (fixed-point) benchmark\n");
+  print_string("1\n");
   init_mem_pool();
+  print_string("2\n");
 
   Body *bodies = (Body *)my_malloc(sizeof(Body) * NUM_BODIES);
 
-  // Initial conditions
+  // Simplified initial conditions (scaled by 1000)
   bodies[0] = (Body){{0, 0, 0}, {0, 0, 0}, 10000};
-  bodies[1] = (Body){{FP_SCALE, 0, 0}, {0, 2, 0}, 1};
-  bodies[2] = (Body){{-FP_SCALE, 0, 0}, {0, -2, 0}, 1};
+  bodies[1] = (Body){{1000, 0, 0}, {0, 2, 0}, 1};
+  bodies[2] = (Body){{-1000, 0, 0}, {0, -2, 0}, 1};
 
   zero_velocity(bodies);
-
-  for (int i = 0; i < STEPS; ++i) {
-    if (i % 10000000 == 0) {
-      print_string("Step "); print_int(i); print_string("\n");
-    }
+  for (int i = 0; i < STEPS; ++i)
     advance(bodies);
-  }
 
   print_state(bodies);
 }
