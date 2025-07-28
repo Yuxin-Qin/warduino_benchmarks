@@ -1,5 +1,5 @@
 // CHERI-compatible N-body benchmark (WARDuino-compatible)
-// Converted from original C with minimal changes for CHERI
+// Fully ported version with start(), CHERI-safe memory allocation, and WARDuino-compatible output
 
 void print_string(const char *s);
 void print_int(int n);
@@ -9,11 +9,28 @@ void print_double(double d);
 #define SOLAR_MASS (4 * PI * PI)
 #define DAYS_PER_YEAR 365.24
 
+#define POOL_SIZE 8192
+#define CELL_SIZE 64
+
+static char memory_pool[POOL_SIZE];
+static int mem_offset = 0;
+
+void *my_malloc(unsigned int size) {
+  if (mem_offset + size > POOL_SIZE) return 0;
+  void *ptr = &memory_pool[mem_offset];
+  mem_offset += size;
+  return ptr;
+}
+
+void my_reset_memory() {
+  mem_offset = 0;
+}
+
 struct body {
   double x[3], fill, v[3], mass;
 };
 
-static struct body solar_bodies[] = {
+static struct body solar_bodies_template[] = {
   {{0., 0., 0.}, 0., {0., 0., 0.}, SOLAR_MASS},
   {{4.84143144246472090, -1.16032004402742839, -1.03622044471123109e-01}, 0.,
    {1.66007664274403694e-03 * DAYS_PER_YEAR,
@@ -98,15 +115,19 @@ void print_double(double x) {
 }
 
 void start() {
-  int steps = 50000000; // hardcoded for now
-  offset_momentum(solar_bodies, BODIES_SIZE);
+  my_reset_memory();
+  struct body *bodies = (struct body *)my_malloc(sizeof(solar_bodies_template));
+  for (int i = 0; i < BODIES_SIZE; i++) bodies[i] = solar_bodies_template[i];
+
+  int steps = 10000; // CHERI-safe benchmark step count
+  offset_momentum(bodies, BODIES_SIZE);
 
   print_string("Initial energy:\n");
-  print_double(bodies_energy(solar_bodies, BODIES_SIZE));
+  print_double(bodies_energy(bodies, BODIES_SIZE));
 
   for (int i = 0; i < steps; i++)
-    bodies_advance(solar_bodies, BODIES_SIZE, 0.01);
+    bodies_advance(bodies, BODIES_SIZE, 0.01);
 
   print_string("Final energy:\n");
-  print_double(bodies_energy(solar_bodies, BODIES_SIZE));
+  print_double(bodies_energy(bodies, BODIES_SIZE));
 }
