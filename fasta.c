@@ -23,9 +23,11 @@ typedef struct {
   float probability;
 } nucleotide_info;
 
+static char print_char_buf[2];
 void print_char(char c) {
-  char buf[2] = {c, '\0'};
-  print_string(buf);
+  print_char_buf[0] = c;
+  print_char_buf[1] = '\0';
+  print_string(print_char_buf);
 }
 
 // Repeat and wrap string into output
