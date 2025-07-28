@@ -11,7 +11,7 @@
 
 // Capability-safe I/O stubs (to be provided externally)
 void print_string(const char *s);
-void print_char(char c);
+void print_int(int n);
 void print_buffer(const char *buf, size_t len);
 void *my_malloc(unsigned int size);
 void my_free(void *ptr);
@@ -22,6 +22,11 @@ typedef struct {
   char letter;
   float probability;
 } nucleotide_info;
+
+void print_char(char c) {
+  char buf[2] = {c, '\0'};
+  print_string(buf);
+}
 
 // Repeat and wrap string into output
 void repeat_and_wrap_string(const char *str, intnative_t total_chars) {
@@ -37,7 +42,7 @@ void repeat_and_wrap_string(const char *str, intnative_t total_chars) {
     for (int i = 0; i < to_copy; i++) {
       print_char(str[(offset + i) % str_len]);
     }
-    print_char('\n');
+    print_string("\n");
     offset = (offset + to_copy) % str_len;
     total_printed += to_copy;
   }
@@ -75,14 +80,14 @@ void generate_and_wrap_pseudorandom_dna(const nucleotide_info *info, int count, 
     if (col == MAXIMUM_LINE_WIDTH) {
       line[col] = '\0';
       print_string(line);
-      print_char('\n');
+      print_string("\n");
       col = 0;
     }
   }
   if (col > 0) {
     line[col] = '\0';
     print_string(line);
-    print_char('\n');
+    print_string("\n");
   }
 }
 
