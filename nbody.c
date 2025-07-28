@@ -135,7 +135,7 @@ double bodies_energy(struct body *bodies, int nbodies) {
 void start() {
   init_mem_pool();
 
-  int steps = 1000; // smaller for test
+  int steps = 50000000; // smaller for test
   offset_momentum(solar_bodies, BODIES_SIZE);
 
   print_string("Initial energy:\n");
