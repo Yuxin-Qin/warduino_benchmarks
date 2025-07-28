@@ -19,5 +19,5 @@ void start() {
   print_string("CHERI-safe I/O test\n");
   print_string("Print benchmark completed.\n");
 
-  print_string("=== END ===");
+  print_string("=== END ===\n");
 }
