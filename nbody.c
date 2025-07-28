@@ -1,34 +1,27 @@
-// WARDuino-compatible CHERI-safe malloc version of N-Body benchmark
-// No stdio, no dynamic memory allocation. Uses WARDuino print primitives.
+// WARDuino-compatible CHERI-safe N-body benchmark
+// start() must return void; uses static malloc; prints scaled doubles
+
+#define NULL 0
+
+void print_string(const char *s);
+void print_int(int n);
 
 #define PI 3.141592653589793
 #define SOLAR_MASS (4 * PI * PI)
 #define DAYS_PER_YEAR 365.24
 
-#define NULL 0
 #define CELL_SIZE 64
 #define POOL_SIZE_IN_PAGES 2000
 #define PAGE_SIZE (1 << 12)
 
-// ------------------ Print Primitives ------------------
-void print_string(const char *s);
-void print_int(int n);
-void print_double(double d);
+char mem[POOL_SIZE_IN_PAGES * PAGE_SIZE];
+void *pool = NULL;
 
-void print_double(double x) {
-  int scaled = (int)(x * 1e9);
-  print_int(scaled);
-  print_string(" (x1e-9)\n");
-}
-
-// ------------------ Memory Allocator ------------------
 typedef union {
   char bytes[CELL_SIZE];
   void *ptr;
 } Cell;
 
-char mem[POOL_SIZE_IN_PAGES * PAGE_SIZE];
-void *pool = NULL;
 Cell *freelist = NULL;
 
 void init_mem_pool() {
@@ -51,68 +44,89 @@ void *my_malloc(unsigned int num_bytes) {
   return p;
 }
 
-void my_free(void *ptr) {
-  if (!ptr) return;
-  Cell *empty = (Cell *)ptr;
-  empty->ptr = freelist;
-  freelist = empty;
+void print_double(double x) {
+  int scaled = (int)(x * 1e9);
+  print_int(scaled);
+  print_string(" (scaled x1e9)\n");
 }
 
-// ------------------ N-Body Simulation ------------------
-typedef struct {
-  double x[3], v[3], mass;
-} Body;
+struct body {
+  double x[3], fill, v[3], mass;
+};
 
-#define BODIES_COUNT 5
+static struct body solar_bodies[] = {
+  {{0., 0., 0.}, 0., {0., 0., 0.}, SOLAR_MASS},
+  {{4.84143144246472090, -1.16032004402742839, -0.103622044471123109}, 0.,
+   {1.66007664274403694e-03 * DAYS_PER_YEAR,
+    7.69901118419740425e-03 * DAYS_PER_YEAR,
+    -6.90460016972063023e-05 * DAYS_PER_YEAR},
+   9.54791938424326609e-04 * SOLAR_MASS},
+  {{8.34336671824457987, 4.12479856412430479, -0.403523417114321381}, 0.,
+   {-2.76742510726862411e-03 * DAYS_PER_YEAR,
+    4.99852801234917238e-03 * DAYS_PER_YEAR,
+    2.30417297573763929e-05 * DAYS_PER_YEAR},
+   2.85885980666130812e-04 * SOLAR_MASS},
+  {{12.8943695621391310, -15.1111514016986312, -0.223307578892655734}, 0.,
+   {2.96460137564761618e-03 * DAYS_PER_YEAR,
+    2.37847173959480950e-03 * DAYS_PER_YEAR,
+    -2.96589568540237556e-05 * DAYS_PER_YEAR},
+   4.36624404335156298e-05 * SOLAR_MASS},
+  {{15.3796971148509165, -25.9193146099879641, 0.179258772950371181}, 0.,
+   {2.68067772490389322e-03 * DAYS_PER_YEAR,
+    1.62824170038242295e-03 * DAYS_PER_YEAR,
+    -9.51592254519715870e-05 * DAYS_PER_YEAR},
+   5.15138902046611451e-05 * SOLAR_MASS},
+};
 
-Body *allocate_body() {
-  Body *b = (Body *)my_malloc(sizeof(Body));
-  return b;
-}
+#define BODIES_SIZE 5
 
-void offset_momentum(Body **bodies, int n) {
-  for (int i = 0; i < n; i++)
+void offset_momentum(struct body *bodies, int nbodies) {
+  for (int i = 0; i < nbodies; i++)
     for (int k = 0; k < 3; k++)
-      bodies[0]->v[k] -= bodies[i]->v[k] * bodies[i]->mass / SOLAR_MASS;
+      bodies[0].v[k] -= bodies[i].v[k] * bodies[i].mass / SOLAR_MASS;
 }
 
-void bodies_advance(Body **bodies, int n, double dt) {
-  for (int i = 0; i < n; i++) {
-    for (int j = i + 1; j < n; j++) {
+double sqrt_approx(double x) {
+  double guess = x / 2.0;
+  for (int i = 0; i < 10; i++) guess = 0.5 * (guess + x / guess);
+  return guess;
+}
+
+void bodies_advance(struct body *bodies, int nbodies, double dt) {
+  for (int i = 0; i < nbodies; i++) {
+    for (int j = i + 1; j < nbodies; j++) {
       double dx[3];
-      for (int k = 0; k < 3; k++)
-        dx[k] = bodies[i]->x[k] - bodies[j]->x[k];
+      for (int k = 0; k < 3; k++) dx[k] = bodies[i].x[k] - bodies[j].x[k];
 
       double dist_sqr = dx[0]*dx[0] + dx[1]*dx[1] + dx[2]*dx[2];
-      double dist = dist_sqr;
-      for (int k = 0; k < 10; k++) dist = 0.5 * (dist + dist_sqr / dist);
+      double dist = sqrt_approx(dist_sqr);
       double mag = dt / (dist_sqr * dist);
 
       for (int k = 0; k < 3; k++) {
         double d = dx[k] * mag;
-        bodies[i]->v[k] -= d * bodies[j]->mass;
-        bodies[j]->v[k] += d * bodies[i]->mass;
+        bodies[i].v[k] -= d * bodies[j].mass;
+        bodies[j].v[k] += d * bodies[i].mass;
       }
     }
   }
-  for (int i = 0; i < n; i++)
+  for (int i = 0; i < nbodies; i++)
     for (int k = 0; k < 3; k++)
-      bodies[i]->x[k] += dt * bodies[i]->v[k];
+      bodies[i].x[k] += dt * bodies[i].v[k];
 }
 
-double bodies_energy(Body **bodies, int n) {
+double bodies_energy(struct body *bodies, int nbodies) {
   double e = 0.0;
-  for (int i = 0; i < n; i++) {
-    double v2 = bodies[i]->v[0]*bodies[i]->v[0] +
-                bodies[i]->v[1]*bodies[i]->v[1] +
-                bodies[i]->v[2]*bodies[i]->v[2];
-    e += 0.5 * bodies[i]->mass * v2;
-    for (int j = i + 1; j < n; j++) {
+  for (int i = 0; i < nbodies; i++) {
+    double v2 = bodies[i].v[0]*bodies[i].v[0] +
+                bodies[i].v[1]*bodies[i].v[1] +
+                bodies[i].v[2]*bodies[i].v[2];
+    e += 0.5 * bodies[i].mass * v2;
+
+    for (int j = i + 1; j < nbodies; j++) {
       double dx[3];
-      for (int k = 0; k < 3; k++) dx[k] = bodies[i]->x[k] - bodies[j]->x[k];
-      double dist = dx[0]*dx[0] + dx[1]*dx[1] + dx[2]*dx[2];
-      for (int k = 0; k < 10; k++) dist = 0.5 * (dist + dx[0]*dx[0] / dist);
-      e -= (bodies[i]->mass * bodies[j]->mass) / dist;
+      for (int k = 0; k < 3; k++) dx[k] = bodies[i].x[k] - bodies[j].x[k];
+      double dist = sqrt_approx(dx[0]*dx[0] + dx[1]*dx[1] + dx[2]*dx[2]);
+      e -= (bodies[i].mass * bodies[j].mass) / dist;
     }
   }
   return e;
@@ -121,40 +135,15 @@ double bodies_energy(Body **bodies, int n) {
 void start() {
   init_mem_pool();
 
-  Body **bodies = (Body **)my_malloc(sizeof(Body *) * BODIES_COUNT);
-  for (int i = 0; i < BODIES_COUNT; i++) bodies[i] = allocate_body();
-
-  // Initialize bodies
-  *bodies[0] = (Body){{0, 0, 0}, {0, 0, 0}, SOLAR_MASS};
-  *bodies[1] = (Body){{4.84143144246472090, -1.16032004402742839, -0.103622044471123109},
-                     {0.00166007664274403694 * DAYS_PER_YEAR,
-                      0.00769901118419740425 * DAYS_PER_YEAR,
-                      -0.0000690460016972063023 * DAYS_PER_YEAR},
-                     0.000954791938424326609 * SOLAR_MASS};
-  *bodies[2] = (Body){{8.34336671824457987, 4.12479856412430479, -0.403523417114321381},
-                     {-0.00276742510726862411 * DAYS_PER_YEAR,
-                      0.00499852801234917238 * DAYS_PER_YEAR,
-                      0.0000230417297573763929 * DAYS_PER_YEAR},
-                     0.000285885980666130812 * SOLAR_MASS};
-  *bodies[3] = (Body){{12.8943695621391310, -15.1111514016986312, -0.223307578892655734},
-                     {0.00296460137564761618 * DAYS_PER_YEAR,
-                      0.00237847173959480950 * DAYS_PER_YEAR,
-                      -0.0000296589568540237556 * DAYS_PER_YEAR},
-                     0.0000436624404335156298 * SOLAR_MASS};
-  *bodies[4] = (Body){{15.3796971148509165, -25.9193146099879641, 0.179258772950371181},
-                     {0.00268067772490389322 * DAYS_PER_YEAR,
-                      0.00162824170038242295 * DAYS_PER_YEAR,
-                      -0.0000951592254519715870 * DAYS_PER_YEAR},
-                     0.0000515138902046611451 * SOLAR_MASS};
-
-  offset_momentum(bodies, BODIES_COUNT);
+  int steps = 1000; // smaller for test
+  offset_momentum(solar_bodies, BODIES_SIZE);
 
   print_string("Initial energy:\n");
-  print_double(bodies_energy(bodies, BODIES_COUNT));
+  print_double(bodies_energy(solar_bodies, BODIES_SIZE));
 
-  for (int i = 0; i < 1000; i++)
-    bodies_advance(bodies, BODIES_COUNT, 0.01);
+  for (int i = 0; i < steps; i++)
+    bodies_advance(solar_bodies, BODIES_SIZE, 0.01);
 
   print_string("Final energy:\n");
-  print_double(bodies_energy(bodies, BODIES_COUNT));
+  print_double(bodies_energy(solar_bodies, BODIES_SIZE));
 }
