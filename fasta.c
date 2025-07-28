@@ -91,17 +91,11 @@ void generate_and_wrap_pseudorandom_dna(const nucleotide_info *info, int count, 
     print_string(line);
     print_string("\n");
   }
-
-  print_string("Generated characters: ");
-  print_int((int)total_chars);
-  print_string("\n\n");
 }
 
 // Entry point without arguments to match wdcli --invoke start
 void start() {
-  const int n = 1000;
-
-  print_string("\n>>> STARTING FASTA BENCHMARK <<<\n\n");
+  const int n = 25000000;
 
   print_string(">ONE Homo sapiens alu\n");
   const char alu[] =
@@ -125,6 +119,5 @@ void start() {
     { 'g', 0.1975473066391 },{ 't', 0.3015094502008 }
   };
   generate_and_wrap_pseudorandom_dna(homos, sizeof(homos)/sizeof(nucleotide_info), 5 * n);
-
-  print_string("\n>>> END FASTA BENCHMARK <<<\n");
+  print_int(4);
 }
