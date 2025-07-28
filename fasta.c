@@ -91,7 +91,10 @@ void generate_and_wrap_pseudorandom_dna(const nucleotide_info *info, int count, 
   }
 }
 
-void start(int n) {
+// Entry point without arguments to match wdcli --invoke start
+void start() {
+  const int n = 25000000;
+
   print_string(">ONE Homo sapiens alu\n");
   const char alu[] =
     "GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGCGGATCACCTGAGGTC"
