@@ -1,149 +1,209 @@
-// WARDuino-compatible CHERI-safe N-body benchmark
-// start() must return void; uses static malloc; prints scaled doubles
+/* The Computer Language Benchmarks Game
+   http://benchmarksgame.alioth.debian.org/
 
-#define NULL 0
-
-void print_string(const char *s);
-void print_int(int n);
+   contributed by Mark C. Lewis
+   modified slightly by Chad Whipkey
+   converted from java to c++,added sse support, by Branimir Maksimovic
+   converted from c++ to c, by Alexey Medvedchikov 
+*/
 
 #define PI 3.141592653589793
-#define SOLAR_MASS (4 * PI * PI)
+#define SOLAR_MASS ( 4 * PI * PI )
 #define DAYS_PER_YEAR 365.24
-
-#define CELL_SIZE 64
-#define POOL_SIZE_IN_PAGES 2000
-#define PAGE_SIZE (1 << 12)
-
-char mem[POOL_SIZE_IN_PAGES * PAGE_SIZE];
-void *pool = NULL;
-
-typedef union {
-  char bytes[CELL_SIZE];
-  void *ptr;
-} Cell;
-
-Cell *freelist = NULL;
-
-void init_mem_pool() {
-  void *p = &mem[0];
-  unsigned int pool_size = POOL_SIZE_IN_PAGES * PAGE_SIZE;
-  Cell *cell = (Cell *)p;
-  while ((char *)cell < ((char *)p + pool_size - CELL_SIZE)) {
-    cell->ptr = cell + 1;
-    cell++;
-  }
-  cell->ptr = NULL;
-  freelist = (Cell *)p;
-  pool = p;
-}
-
-void *my_malloc(unsigned int num_bytes) {
-  if (freelist == NULL) return NULL;
-  void *p = (void *)freelist;
-  freelist = freelist->ptr;
-  return p;
-}
-
-void print_double(double x) {
-  int scaled = (int)(x * 1e9);
-  print_int(scaled);
-  print_string(" (scaled x1e9)\n");
-}
+#define Z 50000000
 
 struct body {
-  double x[3], fill, v[3], mass;
+   double x[3], fill, v[3], mass;
 };
 
 static struct body solar_bodies[] = {
-  {{0., 0., 0.}, 0., {0., 0., 0.}, SOLAR_MASS},
-  {{4.84143144246472090, -1.16032004402742839, -0.103622044471123109}, 0.,
-   {1.66007664274403694e-03 * DAYS_PER_YEAR,
-    7.69901118419740425e-03 * DAYS_PER_YEAR,
-    -6.90460016972063023e-05 * DAYS_PER_YEAR},
-   9.54791938424326609e-04 * SOLAR_MASS},
-  {{8.34336671824457987, 4.12479856412430479, -0.403523417114321381}, 0.,
-   {-2.76742510726862411e-03 * DAYS_PER_YEAR,
-    4.99852801234917238e-03 * DAYS_PER_YEAR,
-    2.30417297573763929e-05 * DAYS_PER_YEAR},
-   2.85885980666130812e-04 * SOLAR_MASS},
-  {{12.8943695621391310, -15.1111514016986312, -0.223307578892655734}, 0.,
-   {2.96460137564761618e-03 * DAYS_PER_YEAR,
-    2.37847173959480950e-03 * DAYS_PER_YEAR,
-    -2.96589568540237556e-05 * DAYS_PER_YEAR},
-   4.36624404335156298e-05 * SOLAR_MASS},
-  {{15.3796971148509165, -25.9193146099879641, 0.179258772950371181}, 0.,
-   {2.68067772490389322e-03 * DAYS_PER_YEAR,
-    1.62824170038242295e-03 * DAYS_PER_YEAR,
-    -9.51592254519715870e-05 * DAYS_PER_YEAR},
-   5.15138902046611451e-05 * SOLAR_MASS},
+   /* sun */
+   {
+      .x = { 0., 0., 0. },
+      .v = { 0., 0., 0. },
+      .mass = SOLAR_MASS
+   },
+   /* jupiter */
+   {
+      .x = { 4.84143144246472090e+00,
+         -1.16032004402742839e+00,
+         -1.03622044471123109e-01 },
+      .v = { 1.66007664274403694e-03 * DAYS_PER_YEAR,
+         7.69901118419740425e-03 * DAYS_PER_YEAR,
+         -6.90460016972063023e-05 * DAYS_PER_YEAR },
+      .mass = 9.54791938424326609e-04 * SOLAR_MASS
+   },
+   /* saturn */
+   {
+      .x = { 8.34336671824457987e+00,
+         4.12479856412430479e+00,
+         -4.03523417114321381e-01 },
+      .v = { -2.76742510726862411e-03 * DAYS_PER_YEAR,
+         4.99852801234917238e-03 * DAYS_PER_YEAR,
+         2.30417297573763929e-05 * DAYS_PER_YEAR },
+      .mass = 2.85885980666130812e-04 * SOLAR_MASS
+   },
+   /* uranus */
+   {
+      .x = { 1.28943695621391310e+01,
+         -1.51111514016986312e+01,
+         -2.23307578892655734e-01 },
+      .v = { 2.96460137564761618e-03 * DAYS_PER_YEAR,
+         2.37847173959480950e-03 * DAYS_PER_YEAR,
+         -2.96589568540237556e-05 * DAYS_PER_YEAR },
+      .mass = 4.36624404335156298e-05 * SOLAR_MASS
+   },
+   /* neptune */
+   {
+      .x = { 1.53796971148509165e+01,
+         -2.59193146099879641e+01,
+         1.79258772950371181e-01 },
+      .v = { 2.68067772490389322e-03 * DAYS_PER_YEAR,
+         1.62824170038242295e-03 * DAYS_PER_YEAR,
+         -9.51592254519715870e-05 * DAYS_PER_YEAR },
+      .mass = 5.15138902046611451e-05 * SOLAR_MASS
+   }
 };
 
-#define BODIES_SIZE 5
+static const int BODIES_SIZE = sizeof(solar_bodies) / sizeof(solar_bodies[0]);
 
-void offset_momentum(struct body *bodies, int nbodies) {
-  for (int i = 0; i < nbodies; i++)
-    for (int k = 0; k < 3; k++)
-      bodies[0].v[k] -= bodies[i].v[k] * bodies[i].mass / SOLAR_MASS;
+void offset_momentum(struct body *bodies, unsigned int nbodies)
+{
+   unsigned int i, k;
+   for (i = 0; i < nbodies; ++i)
+      for (k = 0; k < 3; ++k)
+         bodies[0].v[k] -= bodies[i].v[k] * bodies[i].mass
+            / SOLAR_MASS;
 }
 
-double sqrt_approx(double x) {
-  double guess = x / 2.0;
-  for (int i = 0; i < 10; i++) guess = 0.5 * (guess + x / guess);
-  return guess;
+typedef struct {
+    double val[2];
+} vec2d;
+
+vec2d vec2d_load(double a, double b) {
+    vec2d v;
+    v.val[0] = a;
+    v.val[1] = b;
+    return v;
 }
 
-void bodies_advance(struct body *bodies, int nbodies, double dt) {
-  for (int i = 0; i < nbodies; i++) {
-    for (int j = i + 1; j < nbodies; j++) {
-      double dx[3];
-      for (int k = 0; k < 3; k++) dx[k] = bodies[i].x[k] - bodies[j].x[k];
+vec2d vec2d_add(vec2d a, vec2d b) {
+    return (vec2d){ .val = { a.val[0] + b.val[0], a.val[1] + b.val[1] } };
+}
 
-      double dist_sqr = dx[0]*dx[0] + dx[1]*dx[1] + dx[2]*dx[2];
-      double dist = sqrt_approx(dist_sqr);
-      double mag = dt / (dist_sqr * dist);
+vec2d vec2d_sub(vec2d a, vec2d b) {
+    return (vec2d){ .val = { a.val[0] - b.val[0], a.val[1] - b.val[1] } };
+}
 
-      for (int k = 0; k < 3; k++) {
-        double d = dx[k] * mag;
-        bodies[i].v[k] -= d * bodies[j].mass;
-        bodies[j].v[k] += d * bodies[i].mass;
+vec2d vec2d_mul(vec2d a, vec2d b) {
+    return (vec2d){ .val = { a.val[0] * b.val[0], a.val[1] * b.val[1] } };
+}
+
+vec2d vec2d_sqrt(vec2d a) {
+    return (vec2d){ .val = { sqrt_approx(a.val[0]), sqrt_approx(a.val[1]) } };
+}
+
+// Optional scalar broadcast
+vec2d vec2d_set1(double x) {
+    return (vec2d){ .val = { x, x } };
+}
+
+// Load low 64 bits from pointer into lower part of v
+vec2d vec2d_loadl(vec2d v, const double *ptr) {
+    v.val[0] = *ptr;
+    return v;
+}
+
+// Load low 64 bits from pointer into upper part of v
+vec2d vec2d_loadh(vec2d v, const double *ptr) {
+    v.val[1] = *ptr;
+    return v;
+}
+
+
+void bodies_advance(struct body *bodies, unsigned int nbodies, double dt)
+{
+   unsigned int N = (nbodies - 1) * nbodies / 2;
+   static struct {
+      double dx[3], fill;
+   } r[1000];
+   static __attribute__((aligned(16))) double mag[1000];
+   unsigned int i, j, k, m;
+   vec2d dx[3], dsquared, distance, dmag;
+
+   for(k = 0, i = 0; i < nbodies - 1; ++i)
+      for(j = i + 1; j < nbodies; ++j, ++k)
+         for ( m = 0; m < 3; ++m)
+            r[k].dx[m] = bodies[i].x[m] - bodies[j].x[m];
+
+   for (i = 0; i < N; i += 2) {
+      for (m = 0; m < 3; ++m) {
+         dx[m] = vec2d_loadl(dx[m], &r[i].dx[m]);
+         dx[m] = vec2d_loadh(dx[m], &r[i+1].dx[m]);
       }
-    }
-  }
-  for (int i = 0; i < nbodies; i++)
-    for (int k = 0; k < 3; k++)
-      bodies[i].x[k] += dt * bodies[i].v[k];
+
+      dsquared = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
+      distance = _mm_cvtps_pd(_mm_rsqrt_ps(_mm_cvtpd_ps(dsquared)));
+
+      for (j = 0; j < 2; ++j)
+         distance = distance * _mm_set1_pd(1.5)
+            - ((_mm_set1_pd(0.5) * dsquared) * distance)
+            * (distance * distance);
+
+      dmag = _mm_set1_pd(dt) / (dsquared) * distance;
+      _mm_store_pd(&mag[i], dmag);
+   }
+
+   for (i = 0, k = 0; i < nbodies - 1; ++i)
+      for ( j = i + 1; j < nbodies; ++j, ++k)
+         for ( m = 0; m < 3; ++m) {
+            bodies[i].v[m] -= r[k].dx[m] * bodies[j].mass
+               * mag[k];
+            bodies[j].v[m] += r[k].dx[m] * bodies[i].mass
+               * mag[k];
+         }
+
+   for (i = 0; i < nbodies; ++i)
+      for ( m = 0; m < 3; ++m)
+         bodies[i].x[m] += dt * bodies[i].v[m];
 }
 
-double bodies_energy(struct body *bodies, int nbodies) {
-  double e = 0.0;
-  for (int i = 0; i < nbodies; i++) {
-    double v2 = bodies[i].v[0]*bodies[i].v[0] +
-                bodies[i].v[1]*bodies[i].v[1] +
-                bodies[i].v[2]*bodies[i].v[2];
-    e += 0.5 * bodies[i].mass * v2;
-
-    for (int j = i + 1; j < nbodies; j++) {
-      double dx[3];
-      for (int k = 0; k < 3; k++) dx[k] = bodies[i].x[k] - bodies[j].x[k];
-      double dist = sqrt_approx(dx[0]*dx[0] + dx[1]*dx[1] + dx[2]*dx[2]);
-      e -= (bodies[i].mass * bodies[j].mass) / dist;
+double my_sqrt(double x) {
+    double guess = x > 1.0 ? x : 1.0;
+    for (int i = 0; i < 10; ++i) {
+        guess = 0.5 * (guess + x / guess);
     }
-  }
-  return e;
+    return guess;
 }
 
-void start() {
-  init_mem_pool();
+double bodies_energy(struct body *bodies, unsigned int nbodies) {
+   double dx[3], distance, e = 0.0;
+   unsigned int i, j, k;
 
-  int steps = 50000000; // smaller for test
-  offset_momentum(solar_bodies, BODIES_SIZE);
+   for (i=0; i < nbodies; ++i) {
+      e += bodies[i].mass * ( bodies[i].v[0] * bodies[i].v[0]
+         + bodies[i].v[1] * bodies[i].v[1]
+         + bodies[i].v[2] * bodies[i].v[2] ) / 2.;
 
-  print_string("Initial energy:\n");
-  print_double(bodies_energy(solar_bodies, BODIES_SIZE));
+      for (j=i+1; j < nbodies; ++j) {
+         for (k = 0; k < 3; ++k)
+            dx[k] = bodies[i].x[k] - bodies[j].x[k];
 
-  for (int i = 0; i < steps; i++)
-    bodies_advance(solar_bodies, BODIES_SIZE, 0.01);
+         double distance = my_sqrt(dx[0]*dx[0] + dx[1]*dx[1] + dx[2]*dx[2]);
 
-  print_string("Final energy:\n");
-  print_double(bodies_energy(solar_bodies, BODIES_SIZE));
+         e -= (bodies[i].mass * bodies[j].mass) / distance;
+      }
+   }
+   return e;
+}
+
+int start(int argc, char** argv)
+{
+   int i;
+   offset_momentum(solar_bodies, BODIES_SIZE);
+   print_int(bodies_energy(solar_bodies, BODIES_SIZE));
+   for (i = 0; i < Z; ++i)
+      bodies_advance(solar_bodies, BODIES_SIZE, 0.01);
+   print_int(bodies_energy(solar_bodies, BODIES_SIZE));
+   return 0;
 }
