@@ -12,6 +12,9 @@
 #define DAYS_PER_YEAR 365.24
 #define Z 50000000
 
+void print_int(int);
+void print_string(const char*);
+
 struct body {
    double x[3], fill, v[3], mass;
 };
@@ -255,14 +258,11 @@ double bodies_energy(struct body *bodies, unsigned int nbodies) {
    return e;
 }
 
-void start() {
-   int i;
-   offset_momentum(solar_bodies, BODIES_SIZE);
-
-   print_int((int)bodies_energy(solar_bodies, BODIES_SIZE));
-   
-   for (i = 0; i < Z; ++i)
-      bodies_advance(solar_bodies, BODIES_SIZE, 0.01);
-
-   print_int((int)bodies_energy(solar_bodies, BODIES_SIZE));
+int start(int argc, char** argv) {
+    offset_momentum(solar_bodies, BODIES_SIZE);
+    print_int((int)bodies_energy(solar_bodies, BODIES_SIZE));
+    for (int i = 0; i < Z; ++i)
+        bodies_advance(solar_bodies, BODIES_SIZE, 0.01);
+    print_int((int)bodies_energy(solar_bodies, BODIES_SIZE));
+    return 0;
 }
