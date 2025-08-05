@@ -77,49 +77,79 @@ void offset_momentum(struct body *bodies, unsigned int nbodies)
 }
 
 typedef struct {
-    double val[2];
+   double val[2];
+   double lo;
+   double hi;
+   double x;
+   double y;
 } vec2d;
 
 vec2d vec2d_load(double a, double b) {
-    vec2d v;
-    v.val[0] = a;
-    v.val[1] = b;
-    return v;
+   vec2d v;
+   v.val[0] = a;
+   v.val[1] = b;
+   return v;
+}
+
+void vec2d_store(double *out, vec2d v) {
+  out[0] = v.x;
+  out[1] = v.y;
 }
 
 vec2d vec2d_add(vec2d a, vec2d b) {
-    return (vec2d){ .val = { a.val[0] + b.val[0], a.val[1] + b.val[1] } };
+   return (vec2d){ .val = { a.val[0] + b.val[0], a.val[1] + b.val[1] } };
 }
 
 vec2d vec2d_sub(vec2d a, vec2d b) {
-    return (vec2d){ .val = { a.val[0] - b.val[0], a.val[1] - b.val[1] } };
+   return (vec2d){ .val = { a.val[0] - b.val[0], a.val[1] - b.val[1] } };
 }
 
 vec2d vec2d_mul(vec2d a, vec2d b) {
-    return (vec2d){ .val = { a.val[0] * b.val[0], a.val[1] * b.val[1] } };
+   return (vec2d){ .val = { a.val[0] * b.val[0], a.val[1] * b.val[1] } };
 }
 
 vec2d vec2d_sqrt(vec2d a) {
-    return (vec2d){ .val = { sqrt_approx(a.val[0]), sqrt_approx(a.val[1]) } };
+   return (vec2d){ .val = { sqrt_approx(a.val[0]), sqrt_approx(a.val[1]) } };
 }
 
 // Optional scalar broadcast
 vec2d vec2d_set1(double x) {
-    return (vec2d){ .val = { x, x } };
+   return (vec2d){ .val = { x, x } };
 }
 
 // Load low 64 bits from pointer into lower part of v
 vec2d vec2d_loadl(vec2d v, const double *ptr) {
-    v.val[0] = *ptr;
-    return v;
+   v.val[0] = *ptr;
+   return v;
 }
 
 // Load low 64 bits from pointer into upper part of v
 vec2d vec2d_loadh(vec2d v, const double *ptr) {
-    v.val[1] = *ptr;
-    return v;
+   v.val[1] = *ptr;
+   return v;
 }
 
+vec2d vec2d_set(double val) {
+    return (vec2d){ val, val };
+}
+
+vec2d vec2d_div(vec2d a, vec2d b) {
+    return (vec2d){ a.lo / b.lo, a.hi / b.hi };
+}
+
+vec2d vec2d_rsqrt(vec2d d){
+      vec2d guess = vec2d_div(vec2d_set(1.0), d); // rough 1/sqrt
+      for (int i = 0; i < 2; i++) {
+         guess = vec2d_mul(vec2d_set(1.5),
+            vec2d_sub(guess,vec2d_mul(
+               vec2d_div(vec2d_set(0.5), d),
+                  vec2d_mul(guess, vec2d_mul(guess, guess))
+               )
+            )
+         );
+      }
+return guess;
+}
 
 void bodies_advance(struct body *bodies, unsigned int nbodies, double dt)
 {
@@ -142,16 +172,36 @@ void bodies_advance(struct body *bodies, unsigned int nbodies, double dt)
          dx[m] = vec2d_loadh(dx[m], &r[i+1].dx[m]);
       }
 
-      dsquared = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
-      distance = _mm_cvtps_pd(_mm_rsqrt_ps(_mm_cvtpd_ps(dsquared)));
+      //dsquared = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
+      vec2d dsquared =  vec2d_add(
+                        vec2d_add(
+                        vec2d_mul(dx[0], dx[0]),
+                        vec2d_mul(dx[1], dx[1])
+                        ),
+                        vec2d_mul(dx[2], dx[2])
+      );
+
+      //distance = _mm_cvtps_pd(_mm_rsqrt_ps(_mm_cvtpd_ps(dsquared)));
+      //distance = (vec2d){5.0, 5.0}; for test @Yuxin
+      distance = vec2d_rsqrt(dsquared);
 
       for (j = 0; j < 2; ++j)
-         distance = distance * _mm_set1_pd(1.5)
-            - ((_mm_set1_pd(0.5) * dsquared) * distance)
+      /*
+         distance = distance * vec2d_set(1.5)
+            - ((vec2d_set(0.5) * dsquared) * distance)
             * (distance * distance);
+      */
+      distance = vec2d_mul(distance, vec2d_set(1.5));
+      vec2d half_dsq = vec2d_mul(vec2d_set(0.5), dsquared);
+      vec2d triple = vec2d_mul(half_dsq, distance);
+      vec2d square = vec2d_mul(distance, distance);
+      distance = vec2d_sub(distance, vec2d_mul(triple, square));
 
-      dmag = _mm_set1_pd(dt) / (dsquared) * distance;
-      _mm_store_pd(&mag[i], dmag);
+      //dmag = _mm_set1_pd(dt) / (dsquared) * distance;
+      vec2d dt_vec = (vec2d){dt, dt};
+      dmag = vec2d_mul(vec2d_div(dt_vec, dsquared), distance);
+
+      vec2d_store(&mag[i], dmag);
    }
 
    for (i = 0, k = 0; i < nbodies - 1; ++i)
