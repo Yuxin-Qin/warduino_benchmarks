@@ -168,7 +168,9 @@ void bodies_advance(struct body *bodies, unsigned int nbodies, double dt)
    static struct {
       double dx[3], fill;
    } r[1000];
-   static __attribute__((aligned(16))) double mag[1000];
+   //static __attribute__((aligned(16))) double mag[1000];
+   static double mag[1000];
+
    unsigned int i, j, k, m;
    vec2d dx[3], dsquared, distance, dmag;
 
