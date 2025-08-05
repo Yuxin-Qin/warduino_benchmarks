@@ -67,6 +67,14 @@ static struct body solar_bodies[] = {
 
 static const int BODIES_SIZE = sizeof(solar_bodies) / sizeof(solar_bodies[0]);
 
+double sqrt_approx(double x) {
+  double guess = x / 2.0;
+  for (int i = 0; i < 10; ++i) {
+    guess = 0.5 * (guess + x / guess);
+  }
+  return guess;
+}
+
 void offset_momentum(struct body *bodies, unsigned int nbodies)
 {
    unsigned int i, k;
