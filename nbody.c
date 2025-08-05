@@ -264,4 +264,5 @@ void start() {
     for (int i = 0; i < Z; ++i)
         bodies_advance(solar_bodies, BODIES_SIZE, 0.01);
     print_int((int)bodies_energy(solar_bodies, BODIES_SIZE));
+    print_string("mian end\n", 11);
 }
