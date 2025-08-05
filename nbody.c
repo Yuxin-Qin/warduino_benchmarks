@@ -222,9 +222,11 @@ void bodies_advance(struct body *bodies, unsigned int nbodies, float dt)
 }
 
 float my_sqrt(float x) {
-    float guess = x > 1.0 ? x : 1.0;
+    if (x <= 0.0f) return 1e-10f;
+    float guess = (x > 1.0f) ? x : 1.0f;
     for (int i = 0; i < 10; ++i) {
-        guess = 0.5 * (guess + x / guess);
+        if (guess == 0.0f) return 1e-10f;  // Avoid divide-by-zero clearly
+        guess = 0.5f * (guess + x / guess);
     }
     return guess;
 }
@@ -254,13 +256,14 @@ void start() {
     print_string("mian start\n", 11);
     offset_momentum(solar_bodies, BODIES_SIZE);
     print_string("test point 1\n", 13);
-    print_int((int)solar_bodies);
-    print_int((int)BODIES_SIZE);
     print_int((int)bodies_energy(solar_bodies, BODIES_SIZE));
     print_string("test point 2\n", 13);
-    for (int i = 0; i < Z; ++i)
+
+    for (int i = 0; i < Z; ++i) {
         bodies_advance(solar_bodies, BODIES_SIZE, 0.01);
-        print_string("test point 3\n", 13);
+    }
+
+    print_string("test point 3\n", 13);
     print_int((int)bodies_energy(solar_bodies, BODIES_SIZE));
     print_string("mian end\n", 9);
 }
