@@ -86,34 +86,31 @@ void offset_momentum(struct body *bodies, unsigned int nbodies)
 
 typedef struct {
    float val[2];
-   float lo;
-   float hi;
-   float x;
-   float y;
 } vec2d;
 
 vec2d vec2d_load(float a, float b) {
-   vec2d v;
-   v.val[0] = a;
-   v.val[1] = b;
-   return v;
+   return (vec2d){ .val = {a, b} };
 }
 
 void vec2d_store(float *out, vec2d v) {
-  out[0] = v.x;
-  out[1] = v.y;
+   out[0] = v.val[0];
+   out[1] = v.val[1];
 }
 
 vec2d vec2d_add(vec2d a, vec2d b) {
-   return (vec2d){ .val = { a.val[0] + b.val[0], a.val[1] + b.val[1] } };
+   return (vec2d){ .val = {a.val[0] + b.val[0], a.val[1] + b.val[1]} };
 }
 
 vec2d vec2d_sub(vec2d a, vec2d b) {
-   return (vec2d){ .val = { a.val[0] - b.val[0], a.val[1] - b.val[1] } };
+   return (vec2d){ .val = {a.val[0] - b.val[0], a.val[1] - b.val[1]} };
 }
 
 vec2d vec2d_mul(vec2d a, vec2d b) {
-   return (vec2d){ .val = { a.val[0] * b.val[0], a.val[1] * b.val[1] } };
+   return (vec2d){ .val = {a.val[0] * b.val[0], a.val[1] * b.val[1]} };
+}
+
+vec2d vec2d_div(vec2d a, vec2d b) {
+   return (vec2d){ .val = {a.val[0] / b.val[0], a.val[1] / b.val[1]} };
 }
 
 vec2d vec2d_sqrt(vec2d a) {
@@ -139,10 +136,6 @@ vec2d vec2d_loadh(vec2d v, const float *ptr) {
 
 vec2d vec2d_set(float val) {
     return (vec2d){ val, val };
-}
-
-vec2d vec2d_div(vec2d a, vec2d b) {
-    return (vec2d){ a.lo / b.lo, a.hi / b.hi };
 }
 
 vec2d vec2d_rsqrt(vec2d d){
@@ -261,13 +254,11 @@ void start() {
     print_string("mian start\n", 11);
     offset_momentum(solar_bodies, BODIES_SIZE);
     print_string("test point 1\n", 13);
-    int temp1 = (int)bodies_energy(solar_bodies, BODIES_SIZE);
-    print_int(temp1);
+    print_int((int)bodies_energy(solar_bodies, BODIES_SIZE));
     print_string("test point 2\n", 13);
     for (int i = 0; i < Z; ++i)
         bodies_advance(solar_bodies, BODIES_SIZE, 0.01);
         print_string("test point 3\n", 13);
-    int temp2 = (int)bodies_energy(solar_bodies, BODIES_SIZE);
-    print_int(temp2);
+    print_int((int)bodies_energy(solar_bodies, BODIES_SIZE));
     print_string("mian end\n", 9);
 }
