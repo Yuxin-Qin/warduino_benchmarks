@@ -16,7 +16,7 @@ void print_int(int);
 void print_string(const char*);
 
 struct body {
-   double x[3], fill, v[3], mass;
+   float x[3], fill, v[3], mass;
 };
 
 static struct body solar_bodies[] = {
@@ -70,8 +70,8 @@ static struct body solar_bodies[] = {
 
 static const int BODIES_SIZE = sizeof(solar_bodies) / sizeof(solar_bodies[0]);
 
-double sqrt_approx(double x) {
-  double guess = x / 2.0;
+float sqrt_approx(float x) {
+  float guess = x / 2.0;
   for (int i = 0; i < 10; ++i) {
     guess = 0.5 * (guess + x / guess);
   }
@@ -88,21 +88,21 @@ void offset_momentum(struct body *bodies, unsigned int nbodies)
 }
 
 typedef struct {
-   double val[2];
-   double lo;
-   double hi;
-   double x;
-   double y;
+   float val[2];
+   float lo;
+   float hi;
+   float x;
+   float y;
 } vec2d;
 
-vec2d vec2d_load(double a, double b) {
+vec2d vec2d_load(float a, float b) {
    vec2d v;
    v.val[0] = a;
    v.val[1] = b;
    return v;
 }
 
-void vec2d_store(double *out, vec2d v) {
+void vec2d_store(float *out, vec2d v) {
   out[0] = v.x;
   out[1] = v.y;
 }
@@ -124,23 +124,23 @@ vec2d vec2d_sqrt(vec2d a) {
 }
 
 // Optional scalar broadcast
-vec2d vec2d_set1(double x) {
+vec2d vec2d_set1(float x) {
    return (vec2d){ .val = { x, x } };
 }
 
 // Load low 64 bits from pointer into lower part of v
-vec2d vec2d_loadl(vec2d v, const double *ptr) {
+vec2d vec2d_loadl(vec2d v, const float *ptr) {
    v.val[0] = *ptr;
    return v;
 }
 
 // Load low 64 bits from pointer into upper part of v
-vec2d vec2d_loadh(vec2d v, const double *ptr) {
+vec2d vec2d_loadh(vec2d v, const float *ptr) {
    v.val[1] = *ptr;
    return v;
 }
 
-vec2d vec2d_set(double val) {
+vec2d vec2d_set(float val) {
     return (vec2d){ val, val };
 }
 
@@ -162,14 +162,14 @@ vec2d vec2d_rsqrt(vec2d d){
 return guess;
 }
 
-void bodies_advance(struct body *bodies, unsigned int nbodies, double dt)
+void bodies_advance(struct body *bodies, unsigned int nbodies, float dt)
 {
    unsigned int N = (nbodies - 1) * nbodies / 2;
    static struct {
-      double dx[3], fill;
+      float dx[3], fill;
    } r[1000];
-   //static __attribute__((aligned(16))) double mag[1000];
-   static double mag[1000];
+   //static __attribute__((aligned(16))) float mag[1000];
+   static float mag[1000];
 
    unsigned int i, j, k, m;
    vec2d dx[3], dsquared, distance, dmag;
@@ -231,16 +231,16 @@ void bodies_advance(struct body *bodies, unsigned int nbodies, double dt)
          bodies[i].x[m] += dt * bodies[i].v[m];
 }
 
-double my_sqrt(double x) {
-    double guess = x > 1.0 ? x : 1.0;
+float my_sqrt(float x) {
+    float guess = x > 1.0 ? x : 1.0;
     for (int i = 0; i < 10; ++i) {
         guess = 0.5 * (guess + x / guess);
     }
     return guess;
 }
 
-double bodies_energy(struct body *bodies, unsigned int nbodies) {
-   double dx[3], distance, e = 0.0;
+float bodies_energy(struct body *bodies, unsigned int nbodies) {
+   float dx[3], distance, e = 0.0;
    unsigned int i, j, k;
 
    for (i=0; i < nbodies; ++i) {
@@ -252,7 +252,7 @@ double bodies_energy(struct body *bodies, unsigned int nbodies) {
          for (k = 0; k < 3; ++k)
             dx[k] = bodies[i].x[k] - bodies[j].x[k];
 
-         double distance = my_sqrt(dx[0]*dx[0] + dx[1]*dx[1] + dx[2]*dx[2]);
+         float distance = my_sqrt(dx[0]*dx[0] + dx[1]*dx[1] + dx[2]*dx[2]);
 
          e -= (bodies[i].mass * bodies[j].mass) / distance;
       }
