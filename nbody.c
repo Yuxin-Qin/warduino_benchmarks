@@ -231,7 +231,7 @@ float my_sqrt(float x) {
     return guess;
 }
 
-int bodies_energy(struct body *bodies, unsigned int nbodies) {
+float bodies_energy(struct body *bodies, unsigned int nbodies) {
    float dx[3], distance, e = 0.0;
    unsigned int i, j, k;
 
@@ -249,7 +249,7 @@ int bodies_energy(struct body *bodies, unsigned int nbodies) {
          e -= (bodies[i].mass * bodies[j].mass) / distance;
       }
    }
-   return (int)e;
+   return e;
 }
 
 void start() {
@@ -260,7 +260,7 @@ void start() {
     print_string("test point 1\n", 13);
     print_int(solar_bodies[0]);
     print_int(BODIES_SIZE);
-    print_int(bodies_energy(solar_bodies, BODIES_SIZE));
+    print_int((int)bodies_energy(solar_bodies, BODIES_SIZE));
     print_string("test point 2\n", 13);
 
     for (int i = 0; i < Z; ++i) {
@@ -268,6 +268,6 @@ void start() {
     }
 
     print_string("test point 3\n", 13);
-    print_int(bodies_energy(solar_bodies, BODIES_SIZE));
+    print_int((int)bodies_energy(solar_bodies, BODIES_SIZE));
     print_string("mian end\n", 9);
 }
