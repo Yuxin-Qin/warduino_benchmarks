@@ -254,6 +254,8 @@ void start() {
     print_string("mian start\n", 11);
     offset_momentum(solar_bodies, BODIES_SIZE);
     print_string("test point 1\n", 13);
+    print_int((int)solar_bodies);
+    print_int((int)BODIES_SIZE);
     print_int((int)bodies_energy(solar_bodies, BODIES_SIZE));
     print_string("test point 2\n", 13);
     for (int i = 0; i < Z; ++i)
