@@ -10,7 +10,7 @@
 #define PI 3.141592653589793
 #define SOLAR_MASS ( 4 * PI * PI )
 #define DAYS_PER_YEAR 365.24
-#define Z 50000000
+#define Z 5000
 
 void print_int(int);
 void print_string(const char*);
