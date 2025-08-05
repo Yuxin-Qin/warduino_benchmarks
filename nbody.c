@@ -258,6 +258,7 @@ float bodies_energy(struct body *bodies, unsigned int nbodies) {
 }
 
 void start() {
+    print_string("mian start", 10);
     offset_momentum(solar_bodies, BODIES_SIZE);
     print_int((int)bodies_energy(solar_bodies, BODIES_SIZE));
     for (int i = 0; i < Z; ++i)
