@@ -260,11 +260,10 @@ float bodies_energy(struct body *bodies, unsigned int nbodies) {
    return e;
 }
 
-int start(int argc, char** argv) {
+void start() {
     offset_momentum(solar_bodies, BODIES_SIZE);
     print_int((int)bodies_energy(solar_bodies, BODIES_SIZE));
     for (int i = 0; i < Z; ++i)
         bodies_advance(solar_bodies, BODIES_SIZE, 0.01);
     print_int((int)bodies_energy(solar_bodies, BODIES_SIZE));
-    return 0;
 }
