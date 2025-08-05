@@ -255,13 +255,14 @@ double bodies_energy(struct body *bodies, unsigned int nbodies) {
    return e;
 }
 
-int start()
-{
+void start() {
    int i;
    offset_momentum(solar_bodies, BODIES_SIZE);
-   print_int(bodies_energy(solar_bodies, BODIES_SIZE));
+
+   print_int((int)bodies_energy(solar_bodies, BODIES_SIZE));
+   
    for (i = 0; i < Z; ++i)
       bodies_advance(solar_bodies, BODIES_SIZE, 0.01);
-   print_int(bodies_energy(solar_bodies, BODIES_SIZE));
-   return 0;
+
+   print_int((int)bodies_energy(solar_bodies, BODIES_SIZE));
 }
