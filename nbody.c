@@ -255,7 +255,7 @@ double bodies_energy(struct body *bodies, unsigned int nbodies) {
    return e;
 }
 
-int start(int argc, char** argv)
+int start()
 {
    int i;
    offset_momentum(solar_bodies, BODIES_SIZE);
