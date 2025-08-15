@@ -28,7 +28,10 @@ a command like this:
 ```
 clang --target=wasm32 -nostdlib -Wl,--no-entry -Wl,--export-all -Wno-implicit-function-declaration -Wl,--allow-undefined -o test.wasm test.c
 ```
-
+For -O2 version
+```
+clang --target=wasm32 -nostdlib -Wl,--no-entry -Wl,--export-all -Wno-implicit-function-declaration -Wl,--allow-undefined -O2 -o test.wasm test.c
+```
 
 This should generate a test.wasm file, which we
 can execute on a pre-built WARDuino interpreter
