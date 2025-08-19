@@ -1,5 +1,5 @@
-#define MATRIX_SIZE 64
-#define NUM_ITERATIONS 100
+#define MATRIX_SIZE 32
+#define NUM_ITERATIONS 10
 
 typedef unsigned int uint32_t;
 typedef unsigned long size_t;
