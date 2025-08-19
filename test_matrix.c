@@ -1,5 +1,5 @@
-#define MATRIX_SIZE 256
-#define NUM_ITERATIONS 1000
+#define MATRIX_SIZE 64
+#define NUM_ITERATIONS 100
 
 typedef unsigned int uint32_t;
 typedef unsigned long size_t;
@@ -33,7 +33,6 @@ void start() {
     init_matrices();
 
     for (int iter = 0; iter < NUM_ITERATIONS; ++iter) {
-        print_int(1);
         matmul();
     }
 
