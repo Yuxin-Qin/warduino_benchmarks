@@ -29,7 +29,7 @@ void matmul() {
     }
 }
 
-int main() {
+void start() {
     init_matrices();
 
     for (int iter = 0; iter < NUM_ITERATIONS; ++iter) {
@@ -46,6 +46,4 @@ int main() {
     print_string("Checksum: ", 10);
     print_int((int)checksum);
     print_string("\n", 2);
-
-    return 0;
 }
