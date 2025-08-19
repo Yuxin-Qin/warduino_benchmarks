@@ -33,6 +33,7 @@ void start() {
     init_matrices();
 
     for (int iter = 0; iter < NUM_ITERATIONS; ++iter) {
+        print_int(1);
         matmul();
     }
 

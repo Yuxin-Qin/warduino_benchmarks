@@ -1,4 +1,4 @@
-#define ARRAY_SIZE (100 * 1024) // 100 MB
+#define ARRAY_SIZE (1000 * 1024) // 100 MB
 #define CHUNK_SIZE 4096               // 4 KB
 #define NUM_ITERATIONS 100
 
