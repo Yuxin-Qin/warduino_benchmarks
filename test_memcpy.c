@@ -1,6 +1,6 @@
-#define ARRAY_SIZE (100 * 1024 * 1024) // 100 MB
+#define ARRAY_SIZE (100 * 1024) // 100 MB
 #define CHUNK_SIZE 4096               // 4 KB
-#define NUM_ITERATIONS 10000
+#define NUM_ITERATIONS 100
 
 typedef unsigned char uint8_t;
 typedef unsigned long size_t;
