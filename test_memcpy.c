@@ -15,7 +15,7 @@ void *mem_copy(void *dest, const void *src, size_t n) {
     return dest;
 }
 
-int main() {
+void start() {
     static uint8_t src[ARRAY_SIZE];
     static uint8_t dst[ARRAY_SIZE];
 
@@ -41,6 +41,4 @@ int main() {
     print_string("Checksum: ", 10);
     print_int((int)checksum);
     print_string("\n", 2);
-
-    return 0;
 }
