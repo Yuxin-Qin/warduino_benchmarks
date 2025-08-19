@@ -19,6 +19,14 @@ void init_matrices() {
     }
 }
 
+void clear_matrix() {
+    for (size_t i = 0; i < MATRIX_SIZE; ++i) {
+        for (size_t j = 0; j < MATRIX_SIZE; ++j) {
+            C[i][j] = 0;
+        }
+    }
+}
+
 void matmul() {
     for (size_t i = 0; i < MATRIX_SIZE; ++i) {
         for (size_t j = 0; j < MATRIX_SIZE; ++j) {
@@ -29,13 +37,14 @@ void matmul() {
     }
 }
 
+void print_string(const char* s, int len);  // Assumed external function
+void print_int(int val);                    // Assumed external function
+
 void start() {
     init_matrices();
 
     for (int iter = 0; iter < NUM_ITERATIONS; ++iter) {
-        for (size_t i = 0; i < MATRIX_SIZE; ++i)
-        for (size_t j = 0; j < MATRIX_SIZE; ++j)
-            C[i][j] = 0;
+        clear_matrix();
         matmul();
     }
 
