@@ -11,6 +11,7 @@ static uint32_t C[MATRIX_SIZE][MATRIX_SIZE];
 
 void init_matrices() {
     for (size_t i = 0; i < MATRIX_SIZE; ++i) {
+        print_int(MATRIX_SIZE);
         print_string("i",1);
         for (size_t j = 0; j < MATRIX_SIZE; ++j) {
             print_string("j",1);
