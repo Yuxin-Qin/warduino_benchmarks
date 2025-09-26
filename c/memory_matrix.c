@@ -12,8 +12,8 @@ static uint32_t C[MATRIX_SIZE][MATRIX_SIZE];
 void init_matrices() {
     for (size_t i = 0; i < MATRIX_SIZE; ++i) {
         for (size_t j = 0; j < MATRIX_SIZE; ++j) {
-            A[i][j] = (i + j) % 256;
-            B[i][j] = (i * j) % 256;
+            A[i][j] = (i + j) % 128;
+            B[i][j] = (i * j) % 128;
             C[i][j] = 0;
         }
     }
