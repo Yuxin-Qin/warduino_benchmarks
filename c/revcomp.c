@@ -5,9 +5,9 @@
 
 // Enhanced memory pool configuration for large sequences
 #define CELL_SIZE 64
-#define POOL_SIZE_IN_PAGES 16  // 256KB total memory
+#define POOL_SIZE_IN_PAGES 64  // 256KB total memory
 #define PAGE_SIZE 4096
-#define MAX_SEQUENCE_LENGTH 100000  // Process sequences in chunks
+#define MAX_SEQUENCE_LENGTH 1000  // Process sequences in chunks
 #define MAX_LINE_LENGTH 80
 
 // Simple complement lookup table
