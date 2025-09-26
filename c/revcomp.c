@@ -5,9 +5,9 @@
 
 // Enhanced memory pool configuration for large sequences
 #define CELL_SIZE 64
-#define POOL_SIZE_IN_PAGES 64  // 256KB total memory
-#define PAGE_SIZE 4096
-#define MAX_SEQUENCE_LENGTH 100  // Process sequences in chunks
+#define POOL_SIZE_IN_PAGES 4  // 256KB total memory
+#define PAGE_SIZE 65536
+#define MAX_SEQUENCE_LENGTH 100000  // Process sequences in chunks
 #define MAX_LINE_LENGTH 80
 
 // Simple complement lookup table
@@ -139,10 +139,10 @@ void process_fasta_sequence(const char* header, const char* sequence, int seq_le
     while (pos < seq_len) {
         int line_len = (seq_len - pos > 60) ? 60 : (seq_len - pos);
         
-        for (int i = 0; i < line_len; i++) {
-            char single_char[2] = {output_buffer[pos + i], '\0'};
-            print_string(single_char);
-        }
+        char saved = output_buffer[pos + line_len];      // why: temporarily NUL-terminate slice
+        output_buffer[pos + line_len] = '\0';
+        print_string(&output_buffer[pos]);               // safe: pointer into global buffer
+        output_buffer[pos + line_len] = saved;
         print_string("\n");
         
         pos += line_len;
