@@ -24,8 +24,8 @@ Cell *freelist = NULL;
 int total_allocs = 0;
 int total_frees = 0;
 
-void print_string(const char *s, int len);
-void print_int(int n);
+extern void print_string(const char *s, int len);
+extern void print_int(int n);
 
 void init_mem_pool() {
   void *p = &mem[0];

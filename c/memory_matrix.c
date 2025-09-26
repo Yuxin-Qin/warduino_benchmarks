@@ -1,6 +1,6 @@
-__attribute__((import_module("env"), import_name("print_string")))
+//__attribute__((import_module("env"), import_name("print_string")))
 extern void print_string(const char* s, int len);    // (i32) -> ()
-__attribute__((import_module("env"), import_name("print_int")))
+//__attribute__((import_module("env"), import_name("print_int")))
 extern void print_int(int val);                    // Assumed external function
 
 #define MATRIX_SIZE 32
