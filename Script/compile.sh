@@ -5,8 +5,8 @@ set -euo pipefail
 # why: make paths predictable regardless of where script is invoked
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-SRC_DIR="$ROOT_DIR/C"
-OUT_DIR="$ROOT_DIR/Wasm"
+SRC_DIR="$ROOT_DIR/c"
+OUT_DIR="$ROOT_DIR/wasm"
 
 command -v clang >/dev/null 2>&1 || { echo "Error: clang not found in PATH." >&2; exit 127; }
 [[ -d "$SRC_DIR" ]] || { echo "Error: missing source dir: $SRC_DIR" >&2; exit 1; }
