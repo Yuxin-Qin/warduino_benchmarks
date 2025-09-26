@@ -1,7 +1,7 @@
 // Enhanced WebAssembly version of revcomp for FASTA format processing
 // Supports large DNA sequences from revcomp-input25000000.txt
 
-#include <stdint.h>
+//#include <stdint.h>
 
 // Enhanced memory pool configuration for large sequences
 #define CELL_SIZE 64
