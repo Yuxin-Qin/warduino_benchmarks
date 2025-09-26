@@ -139,10 +139,10 @@ void process_fasta_sequence(const char* header, const char* sequence, int seq_le
     while (pos < seq_len) {
         int line_len = (seq_len - pos > 60) ? 60 : (seq_len - pos);
         
-        char saved = output_buffer[pos + line_len];      // why: temporarily NUL-terminate slice
-        output_buffer[pos + line_len] = '\0';
-        print_string(&output_buffer[pos]);               // safe: pointer into global buffer
-        output_buffer[pos + line_len] = saved;
+        for (int i = 0; i < line_len; i++) {
+            char single_char[2] = {output_buffer[pos + i], '\0'};
+            print_string(single_char);
+        }
         print_string("\n");
         
         pos += line_len;
