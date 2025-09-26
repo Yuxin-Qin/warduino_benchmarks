@@ -1,3 +1,7 @@
+__attribute__((import_module("env"), import_name("print_string")))
+extern void print_string(const char* s, int len);    // (i32) -> ()
+void print_int(int val);                    // Assumed external function
+
 #define MATRIX_SIZE 32
 #define NUM_ITERATIONS 10
 
@@ -36,10 +40,6 @@ void matmul() {
         }
     }
 }
-
-__attribute__((import_module("env"), import_name("print_string")))
-extern void print_string(const char* s, int len);    // (i32) -> ()
-void print_int(int val);                    // Assumed external function
 
 void start() {
     init_matrices();
