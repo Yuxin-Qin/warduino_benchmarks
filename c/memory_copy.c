@@ -6,6 +6,9 @@ typedef unsigned char uint8_t;
 typedef unsigned long size_t;
 typedef unsigned long long uint64_t;
 
+extern void print_string(const char *s, int len);
+extern void print_int(int n);
+
 void *mem_copy(void *dest, const void *src, size_t n) {
     uint8_t *d = (uint8_t *)dest;
     const uint8_t *s = (const uint8_t *)src;

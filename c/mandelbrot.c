@@ -27,6 +27,8 @@
 
 #define CELL_SIZE 1024
 
+extern void print_string(const char *s, int len);
+
 typedef union {
   char bytes[CELL_SIZE];
   void *ptr;
@@ -164,7 +166,7 @@ int start() {
       }
    }
 
-   print_string("completed\n");
+   print_string("completed\n", 11);
    print_int(pixels[0]);
    // Output the image to stdout.
    //fprintf(stdout, "P4\n%jd %jd\n", (intmax_t)image_Width_And_Height,

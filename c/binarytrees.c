@@ -24,7 +24,7 @@ Cell *freelist = NULL;
 int total_allocs = 0;
 int total_frees = 0;
 
-void print_string(const char *s);
+void print_string(const char *s, int len);
 void print_int(int n);
 
 void init_mem_pool() {
@@ -117,11 +117,11 @@ Node MakeTree(int depth) {
 
 void TimeConstruction(int depth) {
   int iters = NumIters(depth);
-  print_string("Creating ");
+  print_string("Creating ", 9);
   print_int(iters);
-  print_string(" trees of depth ");
+  print_string(" trees of depth ", 16);
   print_int(depth);
-  print_string("\n");
+  print_string("\n", 2);
 
   for (int i = 0; i < iters; ++i) {
     Node tmp = allocate_node(sizeof(Node0));
@@ -129,26 +129,26 @@ void TimeConstruction(int depth) {
     destroy_Node(tmp);
   }
 
-  print_string("\tTop down complete\n");
+  print_string("\tTop down complete\n", 21);
 
   for (int i = 0; i < iters; ++i) {
     Node tmp = MakeTree(depth);
     destroy_Node(tmp);
   }
 
-  print_string("\tBottom up complete\n");
+  print_string("\tBottom up complete\n", 22);
 
-  print_string("Allocations: ");
+  print_string("Allocations: ", 13);
   print_int(total_allocs);
-  print_string(", Frees: ");
+  print_string(", Frees: ", 9);
   print_int(total_frees);
-  print_string("\n");
+  print_string("\n", 2);
 }
 
 void start() {
   INIT_MEM;
 
-  print_string("CHERI Binary Trees Benchmark\n");
+  print_string("CHERI Binary Trees Benchmark\n", 30);
 
   Node longLivedTree = allocate_node(sizeof(Node0));
   Populate(6, longLivedTree);
@@ -158,6 +158,6 @@ void start() {
   }
 
   if (!longLivedTree) {
-    print_string("Error: longLivedTree is NULL\n");
+    print_string("Error: longLivedTree is NULL\n", 30);
   }
 }

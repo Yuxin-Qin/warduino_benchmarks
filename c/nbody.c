@@ -12,6 +12,9 @@
 #define DAYS_PER_YEAR 365.24
 #define Z 50000000
 
+extern void print_string(const char *s, int len);
+extern void print_int(int n);
+
 struct body {
    float x[3], fill, v[3], mass;
 };

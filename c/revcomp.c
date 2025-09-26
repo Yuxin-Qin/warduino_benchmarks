@@ -23,7 +23,7 @@ static char sequence_buffer[MAX_SEQUENCE_LENGTH];
 static char output_buffer[MAX_SEQUENCE_LENGTH];
 
 // WebAssembly imports
-extern void print_string(const char* str, int length);
+extern void print_string(const char* str, int len);
 extern void print_int(int value);
 
 // Enhanced memory allocator

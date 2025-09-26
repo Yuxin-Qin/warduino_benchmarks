@@ -1,4 +1,5 @@
-extern void print_string(const char* str, int len);
+extern void print_string(const char *s, int len);
+
 // The Computer Language Benchmarks Game
 #define MAXIMUM_OUTPUT_LENGTH 4096
 
