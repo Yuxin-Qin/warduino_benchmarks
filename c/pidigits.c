@@ -1,16 +1,8 @@
-
-
-// 在文件开头添加这些声明
 extern void print_int(int val);
 extern void print_string(const char* str, int len);
 
 typedef unsigned int my_size_t;
 #define MAX_DIGITS 1500  // 增加容量以支持更高精度
-
-
-
-/******************************string库实现***********************************************/
-
 
 void my_memset(void *ptr, int value, my_size_t num) {
     unsigned char *p = (unsigned char*)ptr;
@@ -32,6 +24,7 @@ typedef struct {
     int len;
     int negative;  // 添加符号位
 } BigInt;
+
 //函数前向声明
 void bigint_sub(const BigInt *a, const BigInt *b, BigInt *res);
 
@@ -352,7 +345,7 @@ int start() {
         
         // 防止无限循环
         if (iterations > 50000) {
-            print_string("Too many iterations\n", 20);
+            print_string("Too many iterations\n", 21);
             return 1;
         }
         
@@ -360,15 +353,15 @@ int start() {
         if (iterations % 1000 == 0) {
             print_string(".", 1);
             if ((iterations / 1000) % 50 == 0) {
-                print_string("\n", 1);
+                print_string("\n", 2);
             }
         }
         
         // 每10000次迭代显示详细状态
         if (iterations % 10000 == 0) {
-            print_string("\nIteration: ", 12);
+            print_string("\nIteration: ", 13);
             print_int(iterations);
-            print_string("\n", 1);
+            print_string("\n", 2);
         }
         
         // 计算下一项
@@ -392,14 +385,14 @@ int start() {
          // 另一种正确方式
 	char digit[1];
 	digit[0] = '0' + d;
-	print_string(digit, 1);
+	print_string(digit, 10);
         
         if (++i % 10 == 0)
-            print_string("\n", 1);
+            print_string("\n", 2);
         
         eliminate_digit(d);
     }
     
-    print_string("\nCalculation complete\n", 22);
+    print_string("\nCalculation complete\n", 24);
     return 0;
 }
