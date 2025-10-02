@@ -326,7 +326,7 @@ void next_term(ui k) {
 
 int start() {
     ui d, k, i;
-    int n = 100;  // 减少到只计算5位
+    int n = 10;  // 减少到只计算5位
     unsigned int iterations = 0;
     
     
