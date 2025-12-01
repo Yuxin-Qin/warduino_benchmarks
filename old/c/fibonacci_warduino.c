@@ -66,7 +66,7 @@ void bigint_add(const BigInt *a, const BigInt *b, BigInt *res) {
 void print_bigint(const BigInt *a) {
     for (int i = a->len - 1; i >= 0; i--) {
         char digit[2] = {'0' + a->digits[i], '\0'};
-        print_string(digit, 1);
+        print_string(digit, 100);
     }
 }
 
