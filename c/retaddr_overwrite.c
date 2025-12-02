@@ -1,22 +1,15 @@
-// retaddr_overwrite.c
-#include <stdio.h>
-#include <string.h>
+// Intentional memory weakness: attempt to smash stack near return address
+// This pattern is highly implementation-dependent and may not always trigger.
 
-void vulnerable(const char *input) {
-    char buf[32];
-
-    // BUG: no bounds check, possible return-address overwrite
-    strcpy(buf, input);
-
-    printf("vulnerable() saw: %.32s\n", buf);
+static int victim(void) {
+    volatile char buf[32];
+    for (int i = 0; i < 256; i++) {
+        ((char *)&buf)[i] = (char)i; // writes far past buf
+    }
+    return 0;
 }
 
-int main(void) {
-    char payload[128];
-    memset(payload, 'A', sizeof(payload));
-    payload[sizeof(payload) - 1] = '\0';
-
-    vulnerable(payload);
-    printf("If you see this, we did not crash (yet).\n");
-    return 0;
+void start() {
+    int r = victim();
+    (void)r;
 }

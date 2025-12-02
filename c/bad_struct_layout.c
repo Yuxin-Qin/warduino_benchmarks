@@ -1,28 +1,22 @@
-// bad_struct_layout.c
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+// Intentional memory weakness: aliasing fields via incorrect struct layout
 
 struct A {
-    char c;
-    int  x;   // typically aligned with padding after c
+    int x;
+    int y;
 };
 
-int main(void) {
-    // BUG: allocate too little space assuming no padding
-    size_t wrong_size = sizeof(char) + sizeof(int); // looks OK
-    if (wrong_size > sizeof(struct A)) {
-        wrong_size = sizeof(struct A) - 1; // force it smaller
-    }
+struct B {
+    int x;
+    char small[2];
+};
 
-    char *buf = malloc(wrong_size);
-    if (!buf) return 1;
+void start() {
+    struct A a;
+    a.x = 10;
+    a.y = 20;
 
-    struct A *p = (struct A *)buf; // mis-sized backing storage
-    p->c = 'Z';
-    p->x = 12345;  // likely writes past allocated region
-
-    printf("Struct A: c=%c x=%d (UB)\n", p->c, p->x);
-    free(buf);
-    return 0;
+    // Reinterpret A as B and write into small
+    struct B *b = (struct B *)&a;
+    b->small[0] = 1;
+    b->small[1] = 2;
 }

@@ -1,27 +1,21 @@
-// data_race.c
-#include <stdio.h>
-#include <pthread.h>
+// Intentional memory weakness: simulated data race (no threads here)
 
-static int counter = 0;  // shared, unsynchronized
+static volatile int shared = 0;
 
-void *worker(void *arg) {
-    for (int i = 0; i < 1000000; i++) {
-        // BUG: unsynchronized read-modify-write
-        counter++;
+static void writer1(void) {
+    for (int i = 0; i < 1000; i++) {
+        shared = shared + 1;
     }
-    return NULL;
 }
 
-int main(void) {
-    pthread_t t1, t2;
+static void writer2(void) {
+    for (int i = 0; i < 1000; i++) {
+        shared = shared - 1;
+    }
+}
 
-    pthread_create(&t1, NULL, worker, NULL);
-    pthread_create(&t2, NULL, worker, NULL);
-
-    pthread_join(t1, NULL);
-    pthread_join(t2, NULL);
-
-    // Expected 2,000,000 if there were no data race
-    printf("Final counter = %d (should be 2000000)\n", counter);
-    return 0;
+void start() {
+    // In a real program these would run concurrently on different threads.
+    writer1();
+    writer2();
 }

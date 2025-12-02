@@ -1,17 +1,13 @@
-// escape_stack.c
-#include <stdio.h>
+// Intentional memory weakness: stack pointer escaping its scope
+static volatile int *global_ptr;
 
-int *return_stack_address(void) {
-    static int call_count = 0;
-    call_count++;
-
-    int local = 100 + call_count;
-    // BUG: returning address of local variable
-    return &local;
+static void leak_stack_address(void) {
+    volatile int x = 7;
+    global_ptr = (int *)&x;
 }
 
-int main(void) {
-    int *p = return_stack_address();
-    printf("Escaped stack pointer value (UB): %d\n", *p);
-    return 0;
+void start() {
+    leak_stack_address();
+    // Use escaped stack pointer after the function returns
+    *global_ptr = 99;
 }

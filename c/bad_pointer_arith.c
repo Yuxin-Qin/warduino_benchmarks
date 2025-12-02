@@ -1,17 +1,8 @@
-// bad_pointer_arith.c
-#include <stdio.h>
-
-int main(void) {
-    int arr[10];
-    for (int i = 0; i < 10; i++) {
-        arr[i] = i;
-    }
-
-    int *p = arr;
-    p += 12;            // BUG: points well past the array
-    *p = 42;            // UB write
-
-    printf("arr[0] = %d\n", arr[0]);
-    return 0;
+// Intentional memory weakness: invalid pointer arithmetic
+void start() {
+    volatile int arr[4] = {10, 20, 30, 40};
+    volatile char *p = (char *)arr;
+    // Step into the middle of an int and reinterpret as int*
+    volatile int *bad = (int *)(p + 1);
+    *bad = 123; // Misaligned, out-of-bounds style write
 }
-

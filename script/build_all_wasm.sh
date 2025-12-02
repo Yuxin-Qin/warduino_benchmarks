@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Root paths
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd)"
-SRC_DIR="$ROOT_DIR/c_wasm"
+SRC_DIR="$ROOT_DIR/c"
 WASM_DIR="$ROOT_DIR/wasm"
 
 mkdir -p "$WASM_DIR"

@@ -1,29 +1,27 @@
-// funcptr_overwrite_demo.c (safer demo version)
-#include <stdio.h>
-#include <string.h>
+// Intentional memory weakness: overwrite of function pointer via nearby buffer
 
-typedef void (*handler_fn)(void);
+typedef int (*fn_ptr)(void);
 
-void safe_handler(void)  { printf("Safe handler called.\n"); }
-void evil_handler(void)  { printf("EVIL handler executed! (simulated hijack)\n"); }
+static int safe_func(void) {
+    return 1;
+}
 
-struct Device {
-    char name[8];
-    handler_fn handler;
-};
+static int evil_func(void) {
+    // never intended to be called in a safe program
+    return 42;
+}
 
-int main(void) {
-    struct Device dev;
-    strcpy(dev.name, "sensor");
-    dev.handler = safe_handler;
+void start() {
+    volatile char buf[16];
+    volatile fn_ptr fp = safe_func;
 
-    printf("Before overflow: handler = safe_handler\n");
+    // Deliberately scribble into memory near fp.
+    // On some layouts this can overwrite fp (undefined behaviour).
+    for (int i = 0; i < 64; i++) {
+        ((char *)&buf)[i] = (char)i;
+    }
 
-    // Simulate overflow: attacker manages to write address of evil_handler
-    // into handler field via a bug in the real program.
-    dev.handler = evil_handler;  // in practice, this would come from overflow
-
-    printf("After overflow: calling dev.handler...\n");
-    dev.handler();
-    return 0;
+    // Call through possibly corrupted function pointer
+    int result = fp();
+    (void)result;
 }

@@ -1,10 +1,7 @@
-// uninitialized.c
-#include <stdio.h>
-
-int main(void) {
-    int x;          // uninitialized
-    int y = x + 1;  // BUG: read of uninitialized variable
-
-    printf("Uninitialized value: %d\n", y);
-    return 0;
+// Intentional memory weakness: use of uninitialized stack data
+void start() {
+    volatile int x;
+    // x is never given a defined initial value
+    volatile int y = x + 1;
+    (void)y;
 }

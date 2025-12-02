@@ -1,13 +1,8 @@
-// buffer_overflow.c
-#include <stdio.h>
-
-int main(void) {
-    char buf[16];
-
-    for (int i = 0; i <= 16; i++) {  // BUG: writes one past the end
-        buf[i] = 'A';
+// Intentional memory weakness: stack buffer overflow
+void start() {
+    volatile char buf[8];
+    // Write past the end of buf
+    for (int i = 0; i < 16; i++) {
+        buf[i] = (char)i;
     }
-
-    printf("buf[0] = %c\n", buf[0]);
-    return 0;
 }

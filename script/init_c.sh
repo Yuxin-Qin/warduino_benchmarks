@@ -1,384 +1,305 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Root of the repo (warduino_benchmarks)
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd)"
+# Root of the warduino_benchmarks repo (script/..)
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+C_DIR="$ROOT/c"
 
-# New directory for wasm-specific C sources
-WASM_SRC_DIR="$ROOT_DIR/c_wasm"
+mkdir -p "$C_DIR"
 
-mkdir -p "$WASM_SRC_DIR"
+echo "[init_c] Root:  $ROOT"
+echo "[init_c] C dir: $C_DIR"
+echo "[init_c] Generating minimal no-libc benchmarks with void start() entrypoint"
 
-echo "Generating Wasm-friendly C benchmarks in: $WASM_SRC_DIR"
-echo
-
-#############################
+############################################################
 # 1) buffer_overflow.c
-#############################
-cat <<'EOF' > "$WASM_SRC_DIR/buffer_overflow.c"
-/*
- * Intentional stack buffer overflow:
- * write 16 bytes into an 8-byte array.
- * No headers, no libc.
- */
-int main(void) {
-    char buf[8];
-    int i;
-    for (i = 0; i < 16; ++i) {
-        buf[i] = (char)i; /* out-of-bounds writes */
+############################################################
+cat > "$C_DIR/buffer_overflow.c" << 'EOF'
+// Intentional memory weakness: stack buffer overflow
+void start() {
+    volatile char buf[8];
+    // Write past the end of buf
+    for (int i = 0; i < 16; i++) {
+        buf[i] = (char)i;
     }
-    return (int)buf[0];
 }
 EOF
 
-#############################
+############################################################
 # 2) oob_read.c
-#############################
-cat <<'EOF' > "$WASM_SRC_DIR/oob_read.c"
-/*
- * Out-of-bounds read from a small array.
- */
-volatile int sink;
-
-int main(void) {
-    int arr[4] = {1, 2, 3, 4};
-    int sum = 0;
-    int i;
-    for (i = 0; i < 8; ++i) { /* read past end */
+############################################################
+cat > "$C_DIR/oob_read.c" << 'EOF'
+// Intentional memory weakness: out-of-bounds read
+void start() {
+    volatile int arr[4] = {1, 2, 3, 4};
+    volatile int sum = 0;
+    // Read past the end of arr
+    for (int i = 0; i < 8; i++) {
         sum += arr[i];
     }
-    sink = sum;
-    return 0;
+    (void)sum;
 }
 EOF
 
-#############################
+############################################################
 # 3) bad_pointer_arith.c
-#############################
-cat <<'EOF' > "$WASM_SRC_DIR/bad_pointer_arith.c"
-/*
- * Invalid pointer arithmetic producing a pointer
- * far away from the original object.
- */
-volatile int sink;
-
-int main(void) {
-    int x = 42;
-    char *base = (char *)&x;
-    /* Intentionally walk far beyond object bounds. */
-    int *p = (int *)(base + 1024);
-    sink = *p; /* invalid dereference */
-    return 0;
+############################################################
+cat > "$C_DIR/bad_pointer_arith.c" << 'EOF'
+// Intentional memory weakness: invalid pointer arithmetic
+void start() {
+    volatile int arr[4] = {10, 20, 30, 40};
+    volatile char *p = (char *)arr;
+    // Step into the middle of an int and reinterpret as int*
+    volatile int *bad = (int *)(p + 1);
+    *bad = 123; // Misaligned, out-of-bounds style write
 }
 EOF
 
-#############################
-# 4) bad_struct_layout.c
-#############################
-cat <<'EOF' > "$WASM_SRC_DIR/bad_struct_layout.c"
-/*
- * Misusing struct layout by reinterpreting memory
- * as a different struct type.
- */
+############################################################
+# 4) misaligned_access.c
+############################################################
+cat > "$C_DIR/misaligned_access.c" << 'EOF'
+// Intentional memory weakness: misaligned access
+void start() {
+    volatile char buf[16];
+    // Force a misaligned int* by offsetting one byte
+    volatile int *ptr = (int *)(buf + 1);
+    *ptr = 0x12345678;
+}
+EOF
+
+############################################################
+# 5) uninitialized.c
+############################################################
+cat > "$C_DIR/uninitialized.c" << 'EOF'
+// Intentional memory weakness: use of uninitialized stack data
+void start() {
+    volatile int x;
+    // x is never given a defined initial value
+    volatile int y = x + 1;
+    (void)y;
+}
+EOF
+
+############################################################
+# 6) stale_pointer.c
+############################################################
+cat > "$C_DIR/stale_pointer.c" << 'EOF'
+// Intentional memory weakness: stale pointer into a local array
+static volatile char *saved;
+
+static void make_pointer(void) {
+    volatile char local[8];
+    for (int i = 0; i < 8; i++) {
+        ((char *)local)[i] = (char)i;
+    }
+    saved = (char *)local; // pointer to stack memory that will go out of scope
+}
+
+void start() {
+    make_pointer();
+    // Use stale pointer after frame is gone
+    saved[0] = 42;
+}
+EOF
+
+############################################################
+# 7) escape_stack.c
+############################################################
+cat > "$C_DIR/escape_stack.c" << 'EOF'
+// Intentional memory weakness: stack pointer escaping its scope
+static volatile int *global_ptr;
+
+static void leak_stack_address(void) {
+    volatile int x = 7;
+    global_ptr = (int *)&x;
+}
+
+void start() {
+    leak_stack_address();
+    // Use escaped stack pointer after the function returns
+    *global_ptr = 99;
+}
+EOF
+
+############################################################
+# 8) use_after_free.c   (simulated tiny allocator)
+############################################################
+cat > "$C_DIR/use_after_free.c" << 'EOF'
+// Intentional memory weakness: conceptual use-after-free
+// We simulate a tiny heap and a dummy "free" to keep everything self-contained.
+
+static char heap[64];
+static int used = 0;
+
+static void *my_alloc(int sz) {
+    if (used + sz > (int)sizeof(heap)) {
+        return 0;
+    }
+    void *p = &heap[used];
+    used += sz;
+    return p;
+}
+
+static void my_free(void *p) {
+    // no real reclamation; just a placeholder
+    (void)p;
+}
+
+void start() {
+    char *p = (char *)my_alloc(16);
+    if (!p) return;
+    for (int i = 0; i < 16; i++) {
+        p[i] = (char)i;
+    }
+    my_free(p);
+    // Conceptual use-after-free: keep writing through the pointer
+    p[0] = 42;
+    p[15] = 99;
+}
+EOF
+
+############################################################
+# 9) double_free.c  (simulated logical double free)
+############################################################
+cat > "$C_DIR/double_free.c" << 'EOF'
+// Intentional memory weakness: conceptual double free
+// Same tiny allocator as use_after_free.c
+
+static char heap[64];
+static int used = 0;
+
+static void *my_alloc(int sz) {
+    if (used + sz > (int)sizeof(heap)) {
+        return 0;
+    }
+    void *p = &heap[used];
+    used += sz;
+    return p;
+}
+
+static void my_free(void *p) {
+    // no real reclamation
+    (void)p;
+}
+
+void start() {
+    char *p = (char *)my_alloc(16);
+    if (!p) return;
+    p[0] = 1;
+    my_free(p);
+    // Conceptual double free
+    my_free(p);
+}
+EOF
+
+############################################################
+# 10) funcptr_overwrite.c
+############################################################
+cat > "$C_DIR/funcptr_overwrite.c" << 'EOF'
+// Intentional memory weakness: overwrite of function pointer via nearby buffer
+
+typedef int (*fn_ptr)(void);
+
+static int safe_func(void) {
+    return 1;
+}
+
+static int evil_func(void) {
+    // never intended to be called in a safe program
+    return 42;
+}
+
+void start() {
+    volatile char buf[16];
+    volatile fn_ptr fp = safe_func;
+
+    // Deliberately scribble into memory near fp.
+    // On some layouts this can overwrite fp (undefined behaviour).
+    for (int i = 0; i < 64; i++) {
+        ((char *)&buf)[i] = (char)i;
+    }
+
+    // Call through possibly corrupted function pointer
+    int result = fp();
+    (void)result;
+}
+EOF
+
+############################################################
+# 11) retaddr_overwrite.c
+############################################################
+cat > "$C_DIR/retaddr_overwrite.c" << 'EOF'
+// Intentional memory weakness: attempt to smash stack near return address
+// This pattern is highly implementation-dependent and may not always trigger.
+
+static int victim(void) {
+    volatile char buf[32];
+    for (int i = 0; i < 256; i++) {
+        ((char *)&buf)[i] = (char)i; // writes far past buf
+    }
+    return 0;
+}
+
+void start() {
+    int r = victim();
+    (void)r;
+}
+EOF
+
+############################################################
+# 12) data_race.c
+############################################################
+cat > "$C_DIR/data_race.c" << 'EOF'
+// Intentional memory weakness: simulated data race (no threads here)
+
+static volatile int shared = 0;
+
+static void writer1(void) {
+    for (int i = 0; i < 1000; i++) {
+        shared = shared + 1;
+    }
+}
+
+static void writer2(void) {
+    for (int i = 0; i < 1000; i++) {
+        shared = shared - 1;
+    }
+}
+
+void start() {
+    // In a real program these would run concurrently on different threads.
+    writer1();
+    writer2();
+}
+EOF
+
+############################################################
+# 13) bad_struct_layout.c
+############################################################
+cat > "$C_DIR/bad_struct_layout.c" << 'EOF'
+// Intentional memory weakness: aliasing fields via incorrect struct layout
+
 struct A {
-    int a;
-    int b;
+    int x;
+    int y;
 };
 
 struct B {
     int x;
-    int y;
-    int z;
+    char small[2];
 };
 
-volatile int sink;
+void start() {
+    struct A a;
+    a.x = 10;
+    a.y = 20;
 
-int main(void) {
-    struct A obj = {1, 2};
-    struct B *p = (struct B *)&obj; /* incorrect layout assumption */
-    sink = p->z; /* access field that does not exist */
-    return 0;
+    // Reinterpret A as B and write into small
+    struct B *b = (struct B *)&a;
+    b->small[0] = 1;
+    b->small[1] = 2;
 }
 EOF
 
-#############################
-# 5) misaligned_access.c
-#############################
-cat <<'EOF' > "$WASM_SRC_DIR/misaligned_access.c"
-/*
- * Force a misaligned int* access by offsetting a char buffer.
- */
-volatile int sink;
-
-int main(void) {
-    char buf[8];
-    /* Intentionally misaligned pointer (implementation-dependent). */
-    int *p = (int *)(buf + 1);
-    *p = 123; /* potentially misaligned write */
-    sink = *p;
-    return 0;
-}
-EOF
-
-#############################
-# 6) uninitialized.c
-#############################
-cat <<'EOF' > "$WASM_SRC_DIR/uninitialized.c"
-/*
- * Use an uninitialized local variable.
- */
-volatile int sink;
-
-int main(void) {
-    int x; /* uninitialized */
-    sink = x; /* use without initialization */
-    return 0;
-}
-EOF
-
-#############################
-# 7) escape_stack.c
-#############################
-cat <<'EOF' > "$WASM_SRC_DIR/escape_stack.c"
-/*
- * Return a pointer to a stack-allocated object and use it later.
- */
-
-static int *global_ptr;
-
-static void leak_stack_pointer(void) {
-    int local = 7;
-    global_ptr = &local; /* escape stack pointer */
-}
-
-volatile int sink;
-
-int main(void) {
-    leak_stack_pointer();
-    /* Use pointer to dead stack frame. */
-    sink = *global_ptr;
-    return 0;
-}
-EOF
-
-#############################
-# 8) stale_pointer.c
-#############################
-cat <<'EOF' > "$WASM_SRC_DIR/stale_pointer.c"
-/*
- * Stale pointer pattern using a simple bump allocator.
- * No real free, but simulates reusing a region.
- */
-
-static char heap_area[32];
-static int heap_offset = 0;
-
-static void *my_alloc(int size) {
-    if (heap_offset + size > (int)sizeof(heap_area)) {
-        return 0;
-    }
-    void *p = &heap_area[heap_offset];
-    heap_offset += size;
-    return p;
-}
-
-/* No-op free; we just simulate conceptual lifetime issues. */
-static void my_free(void *p) {
-    (void)p;
-}
-
-volatile char sink;
-
-int main(void) {
-    char *p1 = (char *)my_alloc(8);
-    char *p2;
-
-    p1[0] = 1;
-    my_free(p1); /* conceptually freed */
-
-    /* Allocate again from the same pool */
-    p2 = (char *)my_alloc(8);
-    p2[0] = 2;
-
-    /* Stale pointer p1 still used */
-    sink = p1[0];
-    return 0;
-}
-EOF
-
-#############################
-# 9) use_after_free.c
-#############################
-cat <<'EOF' > "$WASM_SRC_DIR/use_after_free.c"
-/*
- * Use-after-free-like pattern with a local allocator.
- * No libc malloc/free.
- */
-
-static char heap_area[16];
-static int heap_used = 0;
-
-static void *my_alloc(int size) {
-    if (heap_used + size > (int)sizeof(heap_area)) {
-        return 0;
-    }
-    void *p = &heap_area[heap_used];
-    heap_used += size;
-    return p;
-}
-
-/* Simulated free: does not actually reclaim memory. */
-static void my_free(void *p) {
-    (void)p;
-}
-
-volatile char sink;
-
-int main(void) {
-    char *p = (char *)my_alloc(8);
-    if (!p) {
-        return 0;
-    }
-    p[0] = 42;
-    my_free(p);
-    /* Use pointer after conceptual free. */
-    p[1] = 13;
-    sink = p[1];
-    return 0;
-}
-EOF
-
-#############################
-# 10) double_free.c
-#############################
-cat <<'EOF' > "$WASM_SRC_DIR/double_free.c"
-/*
- * Double-free-like pattern with a simple allocator.
- */
-
-static char heap_area[16];
-static int heap_used = 0;
-
-static void *my_alloc(int size) {
-    if (heap_used + size > (int)sizeof(heap_area)) {
-        return 0;
-    }
-    void *p = &heap_area[heap_used];
-    heap_used += size;
-    return p;
-}
-
-static int freed_flag = 0;
-
-static void my_free(void *p) {
-    (void)p;
-    if (freed_flag) {
-        /* second free on same conceptual object */
-        /* in a real allocator this would be a bug */
-    }
-    freed_flag = 1;
-}
-
-int main(void) {
-    char *p = (char *)my_alloc(8);
-    if (!p) {
-        return 0;
-    }
-    my_free(p);
-    my_free(p); /* double free pattern */
-    return 0;
-}
-EOF
-
-#############################
-# 11) funcptr_overwrite.c
-#############################
-cat <<'EOF' > "$WASM_SRC_DIR/funcptr_overwrite.c"
-/*
- * Overwrite a function pointer via buffer overflow.
- */
-
-typedef void (*func_t)(void);
-
-static int flag = 0;
-
-static void safe_function(void) {
-    flag = 1;
-}
-
-static void evil_function(void) {
-    flag = 2;
-}
-
-int main(void) {
-    char buf[16];
-    func_t fp = safe_function;
-
-    /* Layout: buf[] followed by fp on the stack (approximate).
-       The exact placement is implementation-dependent, but this
-       pattern captures the idea of smashing the function pointer. */
-    int i;
-    for (i = 0; i < 32; ++i) {
-        buf[i] = (char)((unsigned long)evil_function >> (i % 8));
-    }
-
-    fp(); /* potentially corrupted */
-    return flag;
-}
-EOF
-
-#############################
-# 12) retaddr_overwrite.c
-#############################
-cat <<'EOF' > "$WASM_SRC_DIR/retaddr_overwrite.c"
-/*
- * Stack smashing pattern that could overwrite a saved return address
- * in a traditional ABI. Here we just model a large overflow.
- */
-
-static int marker = 0;
-
-static void vulnerable(void) {
-    char buf[16];
-    int i;
-    for (i = 0; i < 64; ++i) {
-        buf[i] = (char)i; /* writes beyond buf[] */
-    }
-    marker = 1;
-}
-
-int main(void) {
-    vulnerable();
-    return marker;
-}
-EOF
-
-#############################
-# 13) data_race.c (sequential pattern only)
-#############################
-cat <<'EOF' > "$WASM_SRC_DIR/data_race.c"
-/*
- * Placeholder for a data race pattern.
- * Real data races require concurrency primitives which are not
- * available here (no threads, no libc). We simulate two writers
- * writing without synchronization, but sequentially.
- */
-
-volatile int shared_var = 0;
-
-static void writer1(void) {
-    shared_var = 1;
-}
-
-static void writer2(void) {
-    shared_var = 2;
-}
-
-int main(void) {
-    writer1();
-    writer2();
-    return shared_var;
-}
-EOF
-
-echo "Done. Generated wasm-specific benchmarks in $WASM_SRC_DIR"
+echo "[init_c] Done. Generated $(ls "$C_DIR"/*.c | wc -l | tr -d ' ') C files in $C_DIR"
