@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Run all .wasm in ../wasm with CHERI wdcli on amarena
 # Output CSV: ../results_cheri.csv  (benchmark,output)
-# Each run: up to 5 seconds, or less if it finishes earlier.
+# Each run: up to 5 seconds, or stop earlier if it finishes.
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 ROOT_DIR="$( cd "${SCRIPT_DIR}/.." && pwd )"
@@ -26,7 +26,7 @@ if [[ ! -d "${WASM_DIR}" ]]; then
   exit 1
 fi
 
-echo "Writing CSV to: ${CSV_OUT}" >&2
+echo "Writing CHERI CSV to: ${CSV_OUT}" >&2
 echo "Using wdcli: ${WDCLI}" >&2
 echo "Timeout per benchmark: ${TIMEOUT_SEC}s" >&2
 
@@ -48,7 +48,7 @@ run_one() {
   local pid=$!
   local elapsed=0
 
-  # Manual timeout (5s)
+  # Manual timeout loop
   while kill -0 "${pid}" 2>/dev/null; do
     if (( elapsed >= TIMEOUT_SEC )); then
       # Timed out: kill and record timeout
@@ -59,7 +59,6 @@ run_one() {
 
       local raw
       raw="$(cat "${tmp_out}" 2>/dev/null || true)"
-      # Collapse newlines and escape quotes
       local out_str
       out_str="$(printf '%s' "${raw}" | tr '\n' ' ' | sed 's/"/""/g')"
 
@@ -80,12 +79,15 @@ run_one() {
   local raw
   raw="$(cat "${tmp_out}" 2>/dev/null || true)"
 
-  # Treat whitespace-only as empty
+  # Collapse all whitespace to test "empty vs non empty"
   local trimmed="${raw//[[:space:]]/}"
 
-  # If it crashed (non-zero exit) and produced no meaningful output,
-  # synthesize the CHERI error message.
-  if (( status != 0 )) && [[ -z "${trimmed}" ]]; then
+  # Key change:
+  # On CHERI, crashes often produce ONLY the kernel/shell line,
+  # which is NOT captured in tmp_out, so raw is empty.
+  # If we see "no meaningful output" from wdcli at all, we treat it
+  # as a CHERI in address space fault and synthesize the message.
+  if [[ -z "${trimmed}" ]]; then
     raw="In-address space security exception (core dumped)"
   fi
 
@@ -93,7 +95,6 @@ run_one() {
   local out_str
   out_str="$(printf '%s' "${raw}" | tr '\n' ' ' | sed 's/"/""/g')"
 
-  # For the CHERI CSV we just store the message itself, no [EXIT ...] prefix
   echo "\"${name}\",\"${out_str}\"" >> "${CSV_OUT}"
 
   rm -f "${tmp_out}"
@@ -111,4 +112,4 @@ for w in "${wasms[@]}"; do
   run_one "${w}"
 done
 
-echo "Done. Results written to ${CSV_OUT}" >&2
+echo "Done. CHERI results written to ${CSV_OUT}" >&2
