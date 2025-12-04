@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# ---------- Config ----------
+TIMEOUT_SEC="${TIMEOUT_SEC:-5}"  # default 5 seconds
+
 # Directory of this script
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # Project root = parent of script dir
@@ -9,8 +12,7 @@ ROOT_DIR="$( cd "${SCRIPT_DIR}/.." && pwd )"
 WASM_DIR="${ROOT_DIR}/wasm"
 OUT_CSV="${ROOT_DIR}/result_rpi.csv"
 
-# On Raspberry Pi, default to a non-CHERI wdcli build.
-# Override with: WDCLI=/path/to/wdcli ./run_all_wasm_rpi.sh
+# On Raspberry Pi, default to non-CHERI wdcli build
 WDCLI="${WDCLI:-${ROOT_DIR}/../WARDuino/build/wdcli}"
 
 if [[ ! -x "$WDCLI" ]]; then
@@ -24,12 +26,57 @@ if [[ ! -d "$WASM_DIR" ]]; then
   exit 1
 fi
 
-echo "Using wdcli: $WDCLI"
-echo "Wasm dir:    $WASM_DIR"
-echo "Output CSV:  $OUT_CSV"
+echo "Using wdcli:  $WDCLI"
+echo "Wasm dir:     $WASM_DIR"
+echo "Output CSV:   $OUT_CSV"
+echo "Timeout each run: ${TIMEOUT_SEC}s"
 echo
 
-# Write CSV header
+# ---------- helper: run with timeout, capture output ----------
+run_with_timeout() {
+  local timeout="$1"; shift
+  local tmp_out
+  local tmp_flag
+  tmp_out="$(mktemp)"
+  tmp_flag="$(mktemp)"
+
+  # Run command in background, capture stdout+stderr
+  "$@" >"$tmp_out" 2>&1 &
+  local cmd_pid=$!
+
+  # Killer in background
+  (
+    sleep "$timeout"
+    if kill -0 "$cmd_pid" 2>/dev/null; then
+      echo "TIMEOUT after ${timeout}s" >"$tmp_flag"
+      kill "$cmd_pid" 2>/dev/null || true
+    fi
+  ) &
+
+  local killer_pid=$!
+
+  # Wait for command
+  wait "$cmd_pid" 2>/dev/null || true
+
+  # Stop killer if still around
+  kill "$killer_pid" 2>/dev/null || true
+
+  # Read output
+  local out_text
+  out_text="$(cat "$tmp_out")"
+
+  # If timeout flag exists, append marker
+  if [[ -s "$tmp_flag" ]]; then
+    out_text="${out_text} [TIMEOUT]"
+  fi
+
+  rm -f "$tmp_out" "$tmp_flag"
+
+  # Echo for caller to capture
+  echo "$out_text"
+}
+
+# ---------- main loop ----------
 echo "benchmark,output" > "$OUT_CSV"
 
 shopt -s nullglob
@@ -37,15 +84,12 @@ for wasm in "$WASM_DIR"/*.wasm; do
   base="$(basename "$wasm" .wasm)"
   echo "Running $base.wasm ..."
 
-  # Capture stdout + stderr; do not stop on nonzero exit
-  output="$("$WDCLI" "$wasm" --invoke start --no-debug 2>&1 || true)"
+  output="$(run_with_timeout "$TIMEOUT_SEC" "$WDCLI" "$wasm" --invoke start --no-debug)"
 
-  # Flatten newlines and carriage returns
+  # Flatten and escape for CSV
   sanitized="$(echo "$output" | tr '\n' ' ' | tr '\r' ' ')"
-  # Escape double quotes for CSV
   sanitized="${sanitized//\"/\"\"}"
 
-  # Append CSV line
   echo "$base,\"$sanitized\"" >> "$OUT_CSV"
 done
 
