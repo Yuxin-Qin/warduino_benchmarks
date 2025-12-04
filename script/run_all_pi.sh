@@ -7,10 +7,11 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 ROOT_DIR="$( cd "${SCRIPT_DIR}/.." && pwd )"
 
 WASM_DIR="${ROOT_DIR}/wasm"
-OUT_CSV="${ROOT_DIR}/result_cheri.csv"
+OUT_CSV="${ROOT_DIR}/result_rpi.csv"
 
-# Path to wdcli (override with: WDCLI=/path/to/wdcli ./run_all_wasm.sh)
-WDCLI="${WDCLI:-${ROOT_DIR}/../WARDuino/build-purecap-hw/wdcli}"
+# On Raspberry Pi, default to a non-CHERI wdcli build.
+# Override with: WDCLI=/path/to/wdcli ./run_all_wasm_rpi.sh
+WDCLI="${WDCLI:-${ROOT_DIR}/../WARDuino/build/wdcli}"
 
 if [[ ! -x "$WDCLI" ]]; then
   echo "Error: wdcli not found or not executable at: $WDCLI" >&2
@@ -36,7 +37,7 @@ for wasm in "$WASM_DIR"/*.wasm; do
   base="$(basename "$wasm" .wasm)"
   echo "Running $base.wasm ..."
 
-  # Capture stdout + stderr
+  # Capture stdout + stderr; do not stop on nonzero exit
   output="$("$WDCLI" "$wasm" --invoke start --no-debug 2>&1 || true)"
 
   # Flatten newlines and carriage returns
