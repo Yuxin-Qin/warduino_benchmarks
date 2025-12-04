@@ -12,7 +12,7 @@ WASM_DIR="${ROOT_DIR}/wasm"
 CSV_OUT="${ROOT_DIR}/results_pi.csv"
 
 # Adjust this to your Pi build of wdcli
-WDCLI="${ROOT_DIR}/../WARDuino/build-native-sw/wdcli"
+WDCLI="${ROOT_DIR}/../WARDuino/build/wdcli"
 
 TIMEOUT_SEC=5
 
