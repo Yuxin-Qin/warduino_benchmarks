@@ -10,6 +10,9 @@ OUT_DIR="$ROOT_DIR/out"
 CC=${CC:-clang}
 CFLAGS=${CFLAGS:--O0 -g}
 
+# macOS: use start() as entry symbol (C symbol -> _start)
+ENTRY_FLAGS="-Wl,-e,_start -nostartfiles"
+
 mkdir -p "$OUT_DIR"
 
 for src in "$SRC_DIR"/*.c; do
@@ -23,7 +26,7 @@ for src in "$SRC_DIR"/*.c; do
     fi
 
     echo "Compiling $src -> $out"
-    $CC $CFLAGS $extra_flags "$src" -o "$out"
+    $CC $CFLAGS $extra_flags $ENTRY_FLAGS "$src" -o "$out"
 done
 
 echo "All benchmarks built into: $OUT_DIR"
