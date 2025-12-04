@@ -1,20 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# This script runs all .wasm files under ../wasm on Raspberry Pi
-# using wdcli and writes results to ../results_pi.csv.
+# This script runs all .wasm files under ../wasm using CHERI wdcli
+# and writes results to ../results_cheri.csv (benchmark,output).
 # Each run is limited to at most 5 seconds.
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 ROOT_DIR="$( cd "${SCRIPT_DIR}/.." && pwd )"
 
 WASM_DIR="${ROOT_DIR}/wasm"
-CSV_OUT="${ROOT_DIR}/results_pi.csv"
+CSV_OUT="${ROOT_DIR}/results_cheri.csv"
 
-# Adjust to your wdcli path on the Pi
-# Example if you built in ~/WARDuino/build-rpi:
-# WDCLI="/home/ubuntu/WARDuino/build-rpi/wdcli"
-WDCLI="${ROOT_DIR}/../WARDuino/build-rpi/wdcli"
+# Adjust if your wdcli path differs
+WDCLI="${ROOT_DIR}/../WARDuino/build-purecap-hw/wdcli"
 
 TIMEOUT_SEC=5
 
