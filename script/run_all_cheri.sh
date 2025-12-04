@@ -43,24 +43,23 @@ run_one() {
   local tmp_out
   tmp_out="$(mktemp)"
 
-  # Run wdcli in background; capture stdout+stderr of wdcli
+  # Run wdcli in background; capture stdout+stderr
   ( "${WDCLI}" "${wasm}" --invoke start --no-debug >"${tmp_out}" 2>&1 ) &
   local pid=$!
   local elapsed=0
 
-  # Poll once per second up to TIMEOUT_SEC
+  # Manual timeout (5s)
   while kill -0 "${pid}" 2>/dev/null; do
     if (( elapsed >= TIMEOUT_SEC )); then
-      # Timeout: kill process and mark as such
+      # Timed out: kill and record timeout
       kill "${pid}" 2>/dev/null || true
       sleep 0.2
       kill -9 "${pid}" 2>/dev/null || true
       wait "${pid}" 2>/dev/null || true
 
       local raw
-      raw="$(cat "${tmp_out}" || true)"
-      # Shell message "In-address space security exception ..." is not in raw;
-      # keep whatever we have, may be empty.
+      raw="$(cat "${tmp_out}" 2>/dev/null || true)"
+      # Collapse newlines and escape quotes
       local out_str
       out_str="$(printf '%s' "${raw}" | tr '\n' ' ' | sed 's/"/""/g')"
 
@@ -72,28 +71,30 @@ run_one() {
     elapsed=$((elapsed + 1))
   done
 
-  # Process finished before timeout
+  # Finished before timeout
   local status=0
   if ! wait "${pid}"; then
     status=$?
   fi
 
   local raw
-  raw="$(cat "${tmp_out}" || true)"
+  raw="$(cat "${tmp_out}" 2>/dev/null || true)"
 
-  # If non-zero exit and no output captured, inject CHERI message
-  if (( status != 0 )) && [[ -z "${raw}" ]]; then
+  # Treat whitespace-only as empty
+  local trimmed="${raw//[[:space:]]/}"
+
+  # If it crashed (non-zero exit) and produced no meaningful output,
+  # synthesize the CHERI error message.
+  if (( status != 0 )) && [[ -z "${trimmed}" ]]; then
     raw="In-address space security exception (core dumped)"
   fi
 
+  # Collapse newlines and escape quotes for CSV
   local out_str
   out_str="$(printf '%s' "${raw}" | tr '\n' ' ' | sed 's/"/""/g')"
 
-  if (( status == 0 )); then
-    echo "\"${name}\",\"${out_str}\"" >> "${CSV_OUT}"
-  else
-    echo "\"${name}\",\"[EXIT ${status}] ${out_str}\"" >> "${CSV_OUT}"
-  fi
+  # For the CHERI CSV we just store the message itself, no [EXIT ...] prefix
+  echo "\"${name}\",\"${out_str}\"" >> "${CSV_OUT}"
 
   rm -f "${tmp_out}"
 }
