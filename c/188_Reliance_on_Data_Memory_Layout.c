@@ -1,21 +1,17 @@
 /* CWE 188: Reliance on Data/Memory Layout */
-
-volatile int sink;
-
 struct Pair {
-    int x;
-    int y;
+    int a;
+    int b;
 };
 
+static struct Pair p = {1, 2};
+volatile int sink;
+
 void start(void) {
-    struct Pair p;
     int *raw = (int *)&p;
-
-    raw[0] = 1;
-    raw[1] = 2;
-
-    /* Assume that "y" immediately follows "x" and manipulate via index */
-    raw[2] = 3; /* out-of-struct write */
-
-    sink = p.x + p.y;
+    /* assume a,b are contiguous and blindly write two ints */
+    raw[0] = 10;
+    raw[1] = 20;
+    raw[2] = 30; /* overwrite beyond struct */
+    sink = p.a + p.b;
 }

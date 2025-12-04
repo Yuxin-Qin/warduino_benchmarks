@@ -1,24 +1,16 @@
-/* CWE 690: Unchecked Return Value to NULL Pointer Dereference */
-
+/* CWE 690: Unchecked Return Value to NULL Pointer Dereference (simulated) */
+static char fake_heap[16];
+static int allocated = 0;
 volatile int sink;
-static char heap_area[32];
-static int heap_index;
 
-char *may_fail_alloc(int n) {
-    if (heap_index + n > 32) {
-        return 0;
-    }
-    heap_index += n;
-    return &heap_area[heap_index - n];
+char *my_alloc(int n) {
+    if (allocated || n > 16) return 0;
+    allocated = 1;
+    return fake_heap;
 }
 
 void start(void) {
-    char *p;
-
-    heap_index = 0;
-
-    p = may_fail_alloc(40); /* fails, returns NULL */
-    /* unchecked */
-    p[0] = 1; /* NULL deref */
+    char *p = my_alloc(32); /* will return 0 */
+    p[0] = 1; /* dereference NULL */
     sink = p[0];
 }

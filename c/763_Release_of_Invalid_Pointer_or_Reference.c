@@ -1,12 +1,15 @@
 /* CWE 763: Release of Invalid Pointer or Reference (simulated) */
-
+static char fake_heap[32];
 volatile int sink;
 
 void my_free(char *p) {
-    sink += (int)(unsigned long)p;
+    if (p < fake_heap || p >= fake_heap + 32) {
+        fake_heap[0] = 55; /* invalid pointer */
+    }
 }
 
 void start(void) {
-    char *invalid = (char *)0x4u;
-    my_free(invalid);
+    char *p = fake_heap + 64; /* definitely outside */
+    my_free(p);
+    sink = fake_heap[0];
 }

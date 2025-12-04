@@ -1,13 +1,9 @@
 /* CWE 587: Assignment of a Fixed Address to a Pointer */
-
 volatile int sink;
 
 void start(void) {
-    /* arbitrary fixed address, invalid in normal execution */
-    int *p = (int *)0x100u;
-
-    /* dereference invalid pointer */
-    *p = 42;
-
-    sink = *p;
+    /* bogus hard-coded address */
+    int *p = (int *)0x100;
+    *p = 42; /* very likely invalid */
+    sink = 1;
 }

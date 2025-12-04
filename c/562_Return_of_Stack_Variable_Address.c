@@ -1,21 +1,15 @@
 /* CWE 562: Return of Stack Variable Address */
-
 volatile int sink;
 
-char *get_stack_buffer(void) {
-    char buf[16];
-    int i;
-    for (i = 0; i < 16; i++) {
-        buf[i] = (char)(i + 1);
-    }
-    return buf; /* returning stack address */
+char *bad_func(void) {
+    static int toggle = 0;
+    char local[8];
+    local[0] = (char)(++toggle);
+    return local; /* returning pointer to stack */
 }
 
 void start(void) {
-    char *dangling = get_stack_buffer();
-    int i;
-
-    for (i = 0; i < 16; i++) {
-        sink += dangling[i]; /* use of invalid stack pointer */
-    }
+    char *p = bad_func();
+    p[0] = 10; /* writing to invalid stack memory */
+    sink = p[0];
 }

@@ -1,27 +1,20 @@
 /* CWE 789: Memory Allocation with Excessive Size Value (simulated) */
-
+static char fake_heap[64];
 volatile int sink;
-static char heap_area[64];
 
-char *my_alloc(int n) {
-    if (n > 64) {
-        return 0;
+char *my_alloc(unsigned int n) {
+    if (n > 64u) {
+        return 0; /* pretend failure */
     }
-    return heap_area;
+    return fake_heap;
 }
 
 void start(void) {
-    char *p = my_alloc(1000); /* excessive request */
-    int i;
-
+    unsigned int n = 1000u;
+    char *p = my_alloc(n); /* returns 0 */
     if (!p) {
-        /* still attempt to use it as if allocation succeeded */
         p = (char *)0;
     }
-
-    for (i = 0; i < 16; i++) {
-        p[i] = (char)i; /* may deref NULL */
-    }
-
+    p[0] = 1; /* NULL deref */
     sink = p[0];
 }

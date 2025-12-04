@@ -1,15 +1,14 @@
 /* CWE 119: Improper Restriction of Operations within the Bounds of a Memory Buffer */
-
+static char buf[16];
 volatile int sink;
 
 void start(void) {
-    char buf[16];
-    char *p = buf;
     int i;
+    int len = 32; /* incorrect bound */
+    char *p = buf;
 
-    /* Writes beyond the logical object limit (improper bounds use) */
-    for (i = 0; i < 32; i++) {
-        p[i] = (char)i; /* out-of-bounds for i >= 16 */
+    for (i = 0; i < len; i++) {
+        p[i] = (char)i; /* writes past buf[15] */
     }
 
     sink = p[0];

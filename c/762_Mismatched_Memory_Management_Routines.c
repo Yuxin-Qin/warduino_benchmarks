@@ -1,13 +1,22 @@
 /* CWE 762: Mismatched Memory Management Routines (simulated) */
-
+static char fake_heap[32];
+static char other_heap[32];
 volatile int sink;
-static char heap_area[32];
+
+char *my_alloc(void) {
+    return fake_heap;
+}
 
 void my_free(char *p) {
-    sink += (int)(unsigned long)p;
+    if (p == other_heap) {
+        other_heap[0] = 11;
+    } else if (p == fake_heap) {
+        fake_heap[0] = 22;
+    }
 }
 
 void start(void) {
-    char *p = heap_area; /* pretend this came from a different allocator */
-    my_free(p); /* mismatched "free" */
+    char *p = my_alloc();
+    my_free(other_heap); /* mismatch: freeing with wrong heap region */
+    sink = fake_heap[0] + other_heap[0];
 }

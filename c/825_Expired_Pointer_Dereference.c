@@ -1,38 +1,28 @@
-/* CWE 825: Expired Pointer Dereference */
-
+/* CWE 825: Expired Pointer Dereference (simulated) */
+static char fake_heap[32];
+static int in_use = 0;
 volatile int sink;
-static char heap_area[32];
-static int heap_index;
 
-char *my_alloc(int n) {
-    char *p;
-    if (heap_index + n > 32) {
-        return 0;
-    }
-    p = &heap_area[heap_index];
-    heap_index += n;
-    return p;
+char *my_alloc(void) {
+    if (in_use) return 0;
+    in_use = 1;
+    return fake_heap;
 }
 
-void my_reset_heap(void) {
-    heap_index = 0;
+void my_free(char *p) {
+    (void)p;
+    in_use = 0;
 }
 
 void start(void) {
-    char *p;
     int i;
-
-    my_reset_heap();
-    p = my_alloc(16);
-
+    char *p = my_alloc();
+    if (!p) return;
     for (i = 0; i < 16; i++) {
-        p[i] = (char)(i + 1);
+        p[i] = (char)i;
     }
-
-    my_reset_heap(); /* invalidates previous allocation logically */
-
-    /* expired pointer dereference */
-    for (i = 0; i < 16; i++) {
-        sink += p[i];
-    }
+    my_free(p);
+    /* pointer p has expired but is reused */
+    p[0] = 77;
+    sink = p[0];
 }

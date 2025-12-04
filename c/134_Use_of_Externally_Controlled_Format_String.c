@@ -1,20 +1,13 @@
-/* CWE 134: Use of Externally-Controlled Format String (simulated, no I/O) */
-
+/* CWE 134: Use of Externally-Controlled Format String (simulated) */
+static char fmt[8] = {'%','x','%','x','%','x','%','x'};
+static char buf[8];
 volatile int sink;
 
 void start(void) {
-    char fmt[16];
-    char user[32];
     int i;
-
-    /* simulate attacker-controlled string with % specifiers */
-    for (i = 0; i < 16; i++) {
-        fmt[i] = '%';
-    }
+    /* naive copy using untrusted "format" as length */
     for (i = 0; i < 32; i++) {
-        user[i] = (char)(i + 33);
+        buf[i] = fmt[i]; /* overflow buf */
     }
-
-    /* No real printf here due to nostdlib; treat as misuse of untrusted layout */
-    sink = fmt[0] + user[0];
+    sink = buf[0];
 }

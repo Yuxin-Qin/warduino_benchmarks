@@ -1,39 +1,22 @@
-/* CWE 401: Missing Release of Memory after Effective Lifetime (leak) */
-
+/* CWE 401: Missing Release of Memory after Effective Lifetime (simulated leak) */
+static char fake_heap[64];
+static int offset = 0;
 volatile int sink;
-static char heap_area[256];
-static int heap_index;
 
-char *alloc_block(int n) {
-    char *p;
-    if (heap_index + n > 256) {
-        return 0;
-    }
-    p = &heap_area[heap_index];
-    heap_index += n;
+char *my_alloc(int n) {
+    if (offset + n > 64) return 0;
+    char *p = fake_heap + offset;
+    offset += n;
     return p;
 }
 
 void start(void) {
-    char *blocks[8];
-    int i, j;
-
-    heap_index = 0;
-
-    for (i = 0; i < 8; i++) {
-        blocks[i] = alloc_block(24);
-        if (!blocks[i]) {
-            break;
-        }
-        for (j = 0; j < 24; j++) {
-            blocks[i][j] = (char)(i + j);
-        }
+    int i;
+    char *p = my_alloc(32);
+    if (!p) return;
+    for (i = 0; i < 32; i++) {
+        p[i] = (char)i;
     }
-
-    /* never free blocks -> leak within artificial heap */
-    for (i = 0; i < 8; i++) {
-        if (blocks[i]) {
-            sink += blocks[i][0];
-        }
-    }
+    /* never freed, leak simulated */
+    sink = p[0];
 }

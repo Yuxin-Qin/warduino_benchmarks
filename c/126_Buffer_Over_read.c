@@ -1,16 +1,12 @@
 /* CWE 126: Buffer Over-read */
-
+static char src[8] = {1,2,3,4,5,6,7,8};
+static char dst[8];
 volatile int sink;
 
 void start(void) {
-    char buf[4];
     int i;
-
-    for (i = 0; i < 4; i++) {
-        buf[i] = (char)(i + 1);
+    for (i = 0; i < 16; i++) {
+        dst[i] = src[i]; /* over-read src */
     }
-
-    for (i = 0; i < 10; i++) {
-        sink += buf[i]; /* buf[4..9] are out-of-bounds */
-    }
+    sink = dst[0];
 }

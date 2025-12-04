@@ -1,19 +1,20 @@
 /* CWE 123: Write-what-where Condition */
-
+static int target1 = 1;
+static int target2 = 2;
 volatile int sink;
 
 void start(void) {
-    int target = 1;
-    int other  = 2;
+    int value = 42;
+    int *where;
 
-    int *where = &target;
-    int *p = &other;
+    /* badly validated index controlling where we write */
+    int idx = 1; /* attacker-controlled in real world */
+    if (idx == 0) {
+        where = &target1;
+    } else {
+        where = &target2;
+    }
 
-    /* Corrupt "where" via invalid offset computation */
-    where = (int *)((char *)where + sizeof(int) * 2); /* points beyond */
-
-    /* Now write to unintended location */
-    *where = *p;
-
-    sink = target;
+    *where = value; /* arbitrary write target */
+    sink = target1 + target2;
 }

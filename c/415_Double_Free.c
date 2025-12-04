@@ -1,39 +1,26 @@
-/* CWE 415: Double Free (simulated custom heap) */
-
+/* CWE 415: Double Free (simulated) */
+static char fake_heap[32];
+static int freed = 0;
 volatile int sink;
-static char heap_area[64];
-static int heap_index;
-static int freed;
 
-char *my_alloc(int n) {
-    char *p;
-    if (heap_index + n > 64) {
-        return 0;
-    }
-    p = &heap_area[heap_index];
-    heap_index += n;
-    return p;
+char *my_alloc(void) {
+    if (freed) return 0;
+    return fake_heap;
 }
 
 void my_free(char *p) {
-    /* simulate double-free detection via simple flag misuse */
+    (void)p;
     if (freed) {
-        /* second free -> memory safety misuse */
-        sink += 1;
+        /* double free state */
+        fake_heap[0] = 42; /* scribble */
     }
     freed = 1;
 }
 
 void start(void) {
-    char *p = my_alloc(16);
-    int i;
-
-    freed = 0;
-
-    for (i = 0; i < 16; i++) {
-        p[i] = (char)(i + 1);
-    }
-
+    char *p = my_alloc();
+    if (!p) return;
     my_free(p);
     my_free(p); /* double free */
+    sink = fake_heap[0];
 }

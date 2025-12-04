@@ -1,15 +1,25 @@
-/* CWE 122: Heap-based Buffer Overflow (simulated heap) */
-
+/* CWE 122: Heap-based Buffer Overflow (simulated tiny heap) */
+static char fake_heap[32];
 volatile int sink;
-static char heap_area[32];
+
+char *my_alloc(int n) {
+    if (n > 32) {
+        return 0;
+    }
+    return fake_heap;
+}
 
 void start(void) {
-    char *heap_buf = heap_area; /* pretend this came from an allocator */
+    char *p = my_alloc(16);
     int i;
 
-    for (i = 0; i < 64; i++) {
-        heap_buf[i] = (char)i; /* out-of-bounds for i >= 32 */
+    if (!p) {
+        return;
     }
 
-    sink = heap_buf[0];
+    for (i = 0; i < 40; i++) {
+        p[i] = (char)i; /* overflow fake_heap */
+    }
+
+    sink = p[0];
 }

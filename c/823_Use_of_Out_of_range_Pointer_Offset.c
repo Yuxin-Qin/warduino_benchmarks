@@ -1,13 +1,10 @@
 /* CWE 823: Use of Out-of-range Pointer Offset */
-
+static char buf[16];
 volatile int sink;
 
 void start(void) {
-    int arr[4];
-    int *p = arr;
-    int *q = p + 10; /* out-of-range offset */
-
-    *q = 5; /* write beyond array */
-
-    sink = arr[0];
+    char *p = buf + 4;
+    char *q = p + 32; /* out-of-range offset */
+    q[0] = 9;
+    sink = buf[0];
 }
