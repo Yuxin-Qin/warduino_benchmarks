@@ -1,49 +1,60 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Root paths
+# Root paths (repo root = parent of this script)
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd)"
-SRC_DIR="$ROOT_DIR/c"
-WASM_DIR="$ROOT_DIR/wasm"
+SRC_ROOT="$ROOT_DIR/c"
+WASM_ROOT="$ROOT_DIR/wasm"
 
-mkdir -p "$WASM_DIR"
+mkdir -p "$WASM_ROOT"
 
-# Choose compiler and flags (edit these if you use a different toolchain)
-CC="${CC:-clang}"
-CFLAGS="${CFLAGS:--O2}"
-# Typical bare WebAssembly target (adjust if you use wasi or emcc)
-WASM_TARGET="${WASM_TARGET:-wasm32-unknown-unknown}"
+# Use wasi-sdk clang in ~/Projects/wasi-sdk-29.0-x86_64-macos by default
+: "${WASI_SDK_PATH:="$HOME/wasi-sdk-29.0-x86_64-macos"}"
 
-echo "Source dir : $SRC_DIR"
-echo "Output dir : $WASM_DIR"
-echo "Compiler   : $CC"
-echo "Target     : $WASM_TARGET"
+CC="$WASI_SDK_PATH/bin/clang"
+CFLAGS=${CFLAGS:--O2}
+WASM_TARGET="wasm32-wasi"
+
+echo "Source root : $SRC_ROOT"
+echo "Output root : $WASM_ROOT"
+echo "Compiler    : $CC"
+echo "Target      : $WASM_TARGET"
 echo
 
+# Collect all .c files recursively under c/
 shopt -s nullglob
-c_files=("$SRC_DIR"/*.c)
+cd "$SRC_ROOT"
+c_files=( $(find . -name '*.c' -print) )
+cd - >/dev/null
 shopt -u nullglob
 
 if [ ${#c_files[@]} -eq 0 ]; then
-  echo "No .c files found in $SRC_DIR"
+  echo "No .c files found under $SRC_ROOT"
   exit 0
 fi
 
-for src in "${c_files[@]}"; do
-  base="$(basename "$src" .c)"
-  out="$WASM_DIR/$base.wasm"
+for rel in "${c_files[@]}"; do
+  # rel is like ./823_Use_of_Out_of_range_Pointer_Offset/823_1.c
+  src="$SRC_ROOT/$rel"
+  rel_clean="${rel#./}"             # strip leading ./ if present
+  rel_dir="$(dirname "$rel_clean")"
+  base="$(basename "$rel_clean" .c)"
 
-  echo "Compiling $base.c -> wasm/$base.wasm"
+  out_dir="$WASM_ROOT/$rel_dir"
+  mkdir -p "$out_dir"
+  out="$out_dir/$base.wasm"
+
+  echo "Compiling $rel_clean -> wasm/$rel_dir/$base.wasm"
 
   "$CC" \
     --target="$WASM_TARGET" \
     -nostdlib \
     -Wl,--no-entry \
-    -Wl,--export-all \
+    -Wl,--export=start \
     -Wl,--allow-undefined \
     $CFLAGS \
     "$src" -o "$out"
 done
 
 echo
-echo "Done. Generated .wasm files in: $WASM_DIR"
+echo "Done. Generated .wasm files in: $WASM_ROOT"
