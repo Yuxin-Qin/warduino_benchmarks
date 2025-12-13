@@ -72,7 +72,7 @@ for rel in "${c_files[@]}"; do
     -I"$SRC_ROOT" \
     -nostdlib \
     -Wl,--no-entry \
-    -Wl,--export=all \
+    -Wl,--export=start \
     -Wno-implicit-function-declaration \
     -Wl,--allow-undefined \
     $CFLAGS \
