@@ -1,22 +1,33 @@
-volatile int sink;
+/* 823_9.c – CWE-823: header/payload layout miscomputed using pages */
 
-static int arena[80];
+#define WASM_PAGE_SIZE 0x10000
+
+extern unsigned char __heap_base[];
+extern void print_int(int);
+
+struct Block {
+    int header[4];
+    int payload[4];
+};
+
+static struct Block block = { {0}, {0} };
 
 void start(void) {
-    int *header  = &arena[0];   /* [0..7]   */
-    int *payload = &arena[8];   /* [8..39]  */
-    int i;
+    int num_pages = __builtin_wasm_memory_size(0);
+    unsigned char *heap_base = __heap_base;
 
-    for (i = 0; i < 8; i++) {
-        header[i] = 10 + i;
-    }
-    for (i = 0; i < 32; i++) {
-        payload[i] = 800 + i;
-    }
+    print_int(num_pages);
+    print_int((int)heap_base);
 
-    /* Bug: treats payload as 40 elements long, overwriting after it. */
-    int *p = payload + 36;
-    *p = 0x7777;
+    /* Correct payload base would be &block.payload[0]. */
+    volatile int *base = &block.payload[0];
 
-    sink = header[0];
+    /* Miscompute out-of-range offset using page size as element count. */
+    int wrong_offset = WASM_PAGE_SIZE * num_pages + 4;
+    volatile int *bad = base + wrong_offset;
+
+    *bad = 0x82300009;
+
+    block.header[0] = 9;
+    print_int(block.header[0]);
 }

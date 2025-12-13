@@ -1,20 +1,29 @@
-volatile int sink;
+/* 823_1.c – CWE-823: simple huge forward offset from heap_base */
 
-static int big_buf[64];
+#define WASM_PAGE_SIZE 0x10000
+
+extern unsigned char __heap_base[];
+extern void print_int(int);
 
 void start(void) {
-    /* Region: logical elements [16..31] inside big_buf */
-    int *region = &big_buf[16];
-    int i;
+    int num_pages = __builtin_wasm_memory_size(0);
+    unsigned char *heap_base = __heap_base;
 
-    for (i = 0; i < 16; i++) {
-        region[i] = i;
-    }
+    /* Diagnostics: how big is memory, where is heap base. */
+    print_int(num_pages);
+    print_int((int)heap_base);
 
-    /* Out-of-range pointer offset: step 20 ints forward from region base.
-       This lands inside big_buf but outside the logical region. */
-    int *p = region + 20;
-    *p = 999;
+    /* Base pointer into heap, then a huge forward offset in bytes. */
+    volatile int *p = (int *)heap_base;
 
-    sink = region[0];
+    /* Out-of-range pointer offset: stride crosses all pages and more. */
+    int byte_offset = num_pages * WASM_PAGE_SIZE + 128;
+    volatile int *bad = (int *)((unsigned char *)p + byte_offset);
+
+    /* Misuse: write through an out-of-range pointer offset. */
+    *bad = 0x82300001;
+
+    /* Keep p “live” so compiler does not optimise it away. */
+    *p = 1;
+    print_int(*p);
 }

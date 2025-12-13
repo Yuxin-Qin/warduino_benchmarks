@@ -1,21 +1,31 @@
-volatile int sink;
+/* 823_7.c – CWE-823: integer overflow in pointer offset calculation */
 
-static int storage[128];
+#define WASM_PAGE_SIZE 0x10000
+
+extern unsigned char __heap_base[];
+extern void print_int(int);
+
+static unsigned char buffer[128];
 
 void start(void) {
-    /* Region is supposed to be indices [40..55], length 16 */
-    int *region = &storage[40];
-    int logical_len = 16;
-    int i;
+    int num_pages = __builtin_wasm_memory_size(0);
+    unsigned char *heap_base = __heap_base;
 
-    for (i = 0; i < logical_len; i++) {
-        region[i] = 600 + i;
-    }
+    print_int(num_pages);
+    print_int((int)heap_base);
 
-    /* Off-by-chunk bug: multiplies index by 2 instead of 1. */
-    int bad_index = 10 * 2;  /* 20, valid index would be < 16 */
-    int *p = region + bad_index;
-    *p = 0x5555;
+    unsigned char *base = buffer;
 
-    sink = region[0];
+    /* Compute an offset in 32-bit int with potential overflow. */
+    int offset = num_pages * WASM_PAGE_SIZE;
+    offset += 0x7FFFFFF0;
+
+    /* Cast back to pointer: this is an out-of-range offset. */
+    unsigned char *bad_byte_ptr = base + offset;
+    volatile int *bad = (int *)bad_byte_ptr;
+
+    *bad = 0x82300007;
+
+    buffer[0] = 7;
+    print_int((int)buffer[0]);
 }

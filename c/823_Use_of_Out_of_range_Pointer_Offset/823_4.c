@@ -1,20 +1,27 @@
-volatile int sink;
+/* 823_4.c – CWE-823: negative offset stepping *before* heap_base */
 
-static int pool[64];
+#define WASM_PAGE_SIZE 0x10000
+
+extern unsigned char __heap_base[];
+extern void print_int(int);
 
 void start(void) {
-    /* Logical region starts at pool[24], length 8: [24..31] */
-    int *region = &pool[24];
-    int i;
+    int num_pages = __builtin_wasm_memory_size(0);
+    unsigned char *heap_base = __heap_base;
 
-    for (i = 0; i < 8; i++) {
-        region[i] = 200 + i;
-    }
+    print_int(num_pages);
+    print_int((int)heap_base);
 
-    /* Out-of-range pointer offset: step backwards beyond region start.
-       This still stays inside 'pool' but violates region bounds. */
-    int *p = region - 4;
-    *p = 0x2222;
+    /* Start from heap_base + some small positive offset. */
+    unsigned char *p = heap_base + 64;
 
-    sink = region[0];
+    /* Large negative offset: walk backwards across multiple pages. */
+    int negative_bytes = num_pages * WASM_PAGE_SIZE + 256;
+    unsigned char *bad_byte_ptr = p - negative_bytes;
+    volatile int *bad = (int *)bad_byte_ptr;
+
+    *bad = 0x82300004;  /* Out-of-range write before region */
+
+    heap_base[1] = 4;
+    print_int((int)heap_base[1]);
 }

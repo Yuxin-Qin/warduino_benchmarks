@@ -1,290 +1,388 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Create a folder for CWE-823 benchmarks and populate it with 10 C programs.
-# Each program demonstrates "Use of Out-of-range Pointer Offset" in a slightly
-# different way, using only raw C (no standard library) and a 'start' entry.
+# Directory of this script
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# Project root = parent of script dir
+ROOT_DIR="$( cd "${SCRIPT_DIR}/.." && pwd )"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-OUT_DIR="${SCRIPT_DIR}/../c/823_Use_of_Out_of_range_Pointer_Offset"
+OUT_DIR="${ROOT_DIR}/c/823_Use_of_Out_of_range_Pointer_Offset"
 
 mkdir -p "${OUT_DIR}"
 
-############################################################
-# 823_1.c  – simple out-of-range pointer within big buffer
-############################################################
+echo "Writing CWE-823 benchmarks to: ${OUT_DIR}"
+
+########################################
+# 823_1.c
+########################################
 cat > "${OUT_DIR}/823_1.c" <<'EOF'
-volatile int sink;
+/* 823_1.c – CWE-823: simple huge forward offset from heap_base */
 
-static int big_buf[64];
+#define WASM_PAGE_SIZE 0x10000
+
+extern unsigned char __heap_base[];
+extern void print_int(int);
 
 void start(void) {
-    /* Region: logical elements [16..31] inside big_buf */
-    int *region = &big_buf[16];
-    int i;
+    int num_pages = __builtin_wasm_memory_size(0);
+    unsigned char *heap_base = __heap_base;
 
-    for (i = 0; i < 16; i++) {
-        region[i] = i;
-    }
+    /* Diagnostics: how big is memory, where is heap base. */
+    print_int(num_pages);
+    print_int((int)heap_base);
 
-    /* Out-of-range pointer offset: step 20 ints forward from region base.
-       This lands inside big_buf but outside the logical region. */
-    int *p = region + 20;
-    *p = 999;
+    /* Base pointer into heap, then a huge forward offset in bytes. */
+    volatile int *p = (int *)heap_base;
 
-    sink = region[0];
+    /* Out-of-range pointer offset: stride crosses all pages and more. */
+    int byte_offset = num_pages * WASM_PAGE_SIZE + 128;
+    volatile int *bad = (int *)((unsigned char *)p + byte_offset);
+
+    /* Misuse: write through an out-of-range pointer offset. */
+    *bad = 0x82300001;
+
+    /* Keep p “live” so compiler does not optimise it away. */
+    *p = 1;
+    print_int(*p);
 }
 EOF
 
-############################################################
-# 823_2.c  – stepping past the end of a subarray "window"
-############################################################
+########################################
+# 823_2.c
+########################################
 cat > "${OUT_DIR}/823_2.c" <<'EOF'
-volatile int sink;
+/* 823_2.c – CWE-823: off-by-one page offset beyond heap region */
 
-static int buffer[128];
+#define WASM_PAGE_SIZE 0x10000
+
+extern unsigned char __heap_base[];
+extern void print_int(int);
 
 void start(void) {
-    /* Define a logical window of length 8 inside buffer */
-    int *window = &buffer[32];
-    int logical_len = 8;
-    int i;
+    int num_pages = __builtin_wasm_memory_size(0);
+    unsigned char *heap_base = __heap_base;
 
-    for (i = 0; i < logical_len; i++) {
-        window[i] = i + 10;
-    }
+    print_int(num_pages);
+    print_int((int)heap_base);
 
-    /* Incorrect offset: write at index 12 instead of < 8.
-       Still within 'buffer', but outside logical window. */
-    int *p = window + 12;
-    *p = 777;
+    /* Compute pointer just past the end of linear memory. */
+    unsigned char *end_of_memory =
+        heap_base + num_pages * WASM_PAGE_SIZE;
 
-    sink = window[0];
+    /* Off-by-one page: one extra page beyond legal region. */
+    unsigned char *bad_byte_ptr = end_of_memory + WASM_PAGE_SIZE;
+    volatile int *bad = (int *)bad_byte_ptr;
+
+    *bad = 0x82300002;  /* Out-of-range write */
+
+    /* Touch heap_base to keep it live. */
+    heap_base[0] = 2;
+    print_int((int)heap_base[0]);
 }
 EOF
 
-############################################################
-# 823_3.c  – crossing region boundary inside a single array
-############################################################
+########################################
+# 823_3.c
+########################################
 cat > "${OUT_DIR}/823_3.c" <<'EOF'
-volatile int sink;
+/* 823_3.c – CWE-823: wrong struct field chosen as base + huge offset */
 
-static int arena[64];
+#define WASM_PAGE_SIZE 0x10000
 
-void start(void) {
-    /* Two logical regions inside one arena */
-    int *region_a = &arena[0];   /* [0..15]   */
-    int *region_b = &arena[16];  /* [16..31]  */
-    int i;
+extern unsigned char __heap_base[];
+extern void print_int(int);
 
-    for (i = 0; i < 16; i++) {
-        region_a[i] = i;
-        region_b[i] = 100 + i;
-    }
-
-    /* Bug: code thinks region_a has length 20 and writes into region_b. */
-    int *p = region_a + 18;
-    *p = 0x1111;
-
-    sink = region_b[0];
-}
-EOF
-
-############################################################
-# 823_4.c  – underflow within an arena (before region)
-############################################################
-cat > "${OUT_DIR}/823_4.c" <<'EOF'
-volatile int sink;
-
-static int pool[64];
-
-void start(void) {
-    /* Logical region starts at pool[24], length 8: [24..31] */
-    int *region = &pool[24];
-    int i;
-
-    for (i = 0; i < 8; i++) {
-        region[i] = 200 + i;
-    }
-
-    /* Out-of-range pointer offset: step backwards beyond region start.
-       This still stays inside 'pool' but violates region bounds. */
-    int *p = region - 4;
-    *p = 0x2222;
-
-    sink = region[0];
-}
-EOF
-
-############################################################
-# 823_5.c  – struct field used as a smaller region
-############################################################
-cat > "${OUT_DIR}/823_5.c" <<'EOF'
-volatile int sink;
-
-struct Block {
-    int header[4];   /* meta-data */
-    int payload[8];  /* logical region */
-    int trailer[4];  /* padding */
+struct Region {
+    int header;
+    int payload[8];
 };
 
-static struct Block blk;
+static struct Region region = { 0, { 0 } };
 
 void start(void) {
-    int *payload = blk.payload;
-    int i;
+    int num_pages = __builtin_wasm_memory_size(0);
+    unsigned char *heap_base = __heap_base;
 
-    for (i = 0; i < 8; i++) {
-        payload[i] = 300 + i;
-    }
+    print_int(num_pages);
+    print_int((int)heap_base);
 
-    /* Bug: code thinks payload has length 12 and writes into trailer. */
-    int *p = payload + 10;  /* crosses into blk.trailer */
-    *p = 0x3333;
+    /* Correct payload base would be &region.payload[0]. */
+    volatile int *base = &region.header;  /* Wrong base (header) */
 
-    sink = blk.payload[0];
+    /* Out-of-range offset scaled by pages. */
+    int offset_words = (num_pages * (WASM_PAGE_SIZE / (int)sizeof(int))) + 32;
+    volatile int *bad = base + offset_words;
+
+    *bad = 0x82300003;       /* Out-of-range pointer offset use */
+
+    region.payload[0] = 3;   /* Keep struct alive */
+    print_int(region.payload[0]);
 }
 EOF
 
-############################################################
-# 823_6.c  – overlapping “logical regions” in a single array
-############################################################
+########################################
+# 823_4.c
+########################################
+cat > "${OUT_DIR}/823_4.c" <<'EOF'
+/* 823_4.c – CWE-823: negative offset stepping *before* heap_base */
+
+#define WASM_PAGE_SIZE 0x10000
+
+extern unsigned char __heap_base[];
+extern void print_int(int);
+
+void start(void) {
+    int num_pages = __builtin_wasm_memory_size(0);
+    unsigned char *heap_base = __heap_base;
+
+    print_int(num_pages);
+    print_int((int)heap_base);
+
+    /* Start from heap_base + some small positive offset. */
+    unsigned char *p = heap_base + 64;
+
+    /* Large negative offset: walk backwards across multiple pages. */
+    int negative_bytes = num_pages * WASM_PAGE_SIZE + 256;
+    unsigned char *bad_byte_ptr = p - negative_bytes;
+    volatile int *bad = (int *)bad_byte_ptr;
+
+    *bad = 0x82300004;  /* Out-of-range write before region */
+
+    heap_base[1] = 4;
+    print_int((int)heap_base[1]);
+}
+EOF
+
+########################################
+# 823_5.c
+########################################
+cat > "${OUT_DIR}/823_5.c" <<'EOF'
+/* 823_5.c – CWE-823: using page count as an array index directly */
+
+#define WASM_PAGE_SIZE 0x10000
+
+extern unsigned char __heap_base[];
+extern void print_int(int);
+
+static int table[32];
+
+void start(void) {
+    int num_pages = __builtin_wasm_memory_size(0);
+    unsigned char *heap_base = __heap_base;
+
+    print_int(num_pages);
+    print_int((int)heap_base);
+
+    /* Fill table with something deterministic. */
+    for (int i = 0; i < 32; i++) {
+        table[i] = i;
+    }
+
+    /* Misuse: treat num_pages as a valid table index. */
+    int idx = num_pages;  /* Typically far beyond [0..31] */
+    volatile int *bad = &table[idx];
+
+    *bad = 0x82300005;  /* Out-of-range pointer offset use */
+
+    /* Keep a valid entry alive. */
+    print_int(table[0]);
+}
+EOF
+
+########################################
+# 823_6.c
+########################################
 cat > "${OUT_DIR}/823_6.c" <<'EOF'
-volatile int sink;
+/* 823_6.c – CWE-823: mixing byte and word counts in offset computation */
 
-static int arena[96];
+#define WASM_PAGE_SIZE 0x10000
+
+extern unsigned char __heap_base[];
+extern void print_int(int);
+
+static int g_words[64];
 
 void start(void) {
-    int *region1 = &arena[8];   /* [8..23]   */
-    int *region2 = &arena[24];  /* [24..39]  */
-    int i;
+    int num_pages = __builtin_wasm_memory_size(0);
+    unsigned char *heap_base = __heap_base;
 
-    for (i = 0; i < 16; i++) {
-        region1[i] = 400 + i;
-        region2[i] = 500 + i;
-    }
+    print_int(num_pages);
+    print_int((int)heap_base);
 
-    /* Code assumes region1 is length 24 and marches into region2. */
-    int *p = region1 + 20;  /* inside arena, outside intended region1 */
-    *p = 0x4444;
+    volatile int *base = g_words;
 
-    sink = region2[0];
+    /* Compute stride as if WASM_PAGE_SIZE already counted words. */
+    int stride_words = num_pages * WASM_PAGE_SIZE;  /* actually bytes */
+
+    /* base + stride_words now leaps far beyond g_words. */
+    volatile int *bad = base + stride_words;
+
+    *bad = 0x82300006;  /* Out-of-range write */
+
+    g_words[1] = 6;
+    print_int(g_words[1]);
 }
 EOF
 
-############################################################
-# 823_7.c  – misuse of an index range on a subregion
-############################################################
+########################################
+# 823_7.c
+########################################
 cat > "${OUT_DIR}/823_7.c" <<'EOF'
-volatile int sink;
+/* 823_7.c – CWE-823: integer overflow in pointer offset calculation */
 
-static int storage[128];
+#define WASM_PAGE_SIZE 0x10000
+
+extern unsigned char __heap_base[];
+extern void print_int(int);
+
+static unsigned char buffer[128];
 
 void start(void) {
-    /* Region is supposed to be indices [40..55], length 16 */
-    int *region = &storage[40];
-    int logical_len = 16;
-    int i;
+    int num_pages = __builtin_wasm_memory_size(0);
+    unsigned char *heap_base = __heap_base;
 
-    for (i = 0; i < logical_len; i++) {
-        region[i] = 600 + i;
-    }
+    print_int(num_pages);
+    print_int((int)heap_base);
 
-    /* Off-by-chunk bug: multiplies index by 2 instead of 1. */
-    int bad_index = 10 * 2;  /* 20, valid index would be < 16 */
-    int *p = region + bad_index;
-    *p = 0x5555;
+    unsigned char *base = buffer;
 
-    sink = region[0];
+    /* Compute an offset in 32-bit int with potential overflow. */
+    int offset = num_pages * WASM_PAGE_SIZE;
+    offset += 0x7FFFFFF0;
+
+    /* Cast back to pointer: this is an out-of-range offset. */
+    unsigned char *bad_byte_ptr = base + offset;
+    volatile int *bad = (int *)bad_byte_ptr;
+
+    *bad = 0x82300007;
+
+    buffer[0] = 7;
+    print_int((int)buffer[0]);
 }
 EOF
 
-############################################################
-# 823_8.c  – “sub-region” carved from a large global arena
-############################################################
+########################################
+# 823_8.c
+########################################
 cat > "${OUT_DIR}/823_8.c" <<'EOF'
-volatile int sink;
+/* 823_8.c – CWE-823: loop gradually stepping pointer across boundary */
 
-static int global_arena[256];
+#define WASM_PAGE_SIZE 0x10000
+
+extern unsigned char __heap_base[];
+extern void print_int(int);
+
+static int ring[8];
 
 void start(void) {
-    /* Sub-region advertised to caller as length 32 starting at 64. */
-    int *sub = &global_arena[64];
-    int advertised_len = 32;
-    int i;
+    int num_pages = __builtin_wasm_memory_size(0);
+    unsigned char *heap_base = __heap_base;
 
-    for (i = 0; i < advertised_len; i++) {
-        sub[i] = 700 + i;
+    print_int(num_pages);
+    print_int((int)heap_base);
+
+    for (int i = 0; i < 8; i++) {
+        ring[i] = i;
     }
 
-    /* Caller miscalculates length and writes beyond end of sub-region. */
-    int wrong_len = advertised_len + 16;
-    int *p = sub + wrong_len;  /* still inside global_arena */
-    *p = 0x6666;
+    volatile int *p = ring;
 
-    sink = sub[0];
+    /* Step pointer in a loop, but stride is much too big. */
+    int step_words = (num_pages * (WASM_PAGE_SIZE / (int)sizeof(int))) / 2;
+
+    for (int k = 0; k < 3; k++) {
+        p = p + step_words;  /* eventually way outside ring[] */
+    }
+
+    /* Final out-of-range write. */
+    *p = 0x82300008;
+
+    /* Preserve one valid element. */
+    print_int(ring[0]);
 }
 EOF
 
-############################################################
-# 823_9.c  – region within an arena “header + payload”
-############################################################
+########################################
+# 823_9.c
+########################################
 cat > "${OUT_DIR}/823_9.c" <<'EOF'
-volatile int sink;
+/* 823_9.c – CWE-823: header/payload layout miscomputed using pages */
 
-static int arena[80];
+#define WASM_PAGE_SIZE 0x10000
+
+extern unsigned char __heap_base[];
+extern void print_int(int);
+
+struct Block {
+    int header[4];
+    int payload[4];
+};
+
+static struct Block block = { {0}, {0} };
 
 void start(void) {
-    int *header  = &arena[0];   /* [0..7]   */
-    int *payload = &arena[8];   /* [8..39]  */
-    int i;
+    int num_pages = __builtin_wasm_memory_size(0);
+    unsigned char *heap_base = __heap_base;
 
-    for (i = 0; i < 8; i++) {
-        header[i] = 10 + i;
-    }
-    for (i = 0; i < 32; i++) {
-        payload[i] = 800 + i;
-    }
+    print_int(num_pages);
+    print_int((int)heap_base);
 
-    /* Bug: treats payload as 40 elements long, overwriting after it. */
-    int *p = payload + 36;
-    *p = 0x7777;
+    /* Correct payload base would be &block.payload[0]. */
+    volatile int *base = &block.payload[0];
 
-    sink = header[0];
+    /* Miscompute out-of-range offset using page size as element count. */
+    int wrong_offset = WASM_PAGE_SIZE * num_pages + 4;
+    volatile int *bad = base + wrong_offset;
+
+    *bad = 0x82300009;
+
+    block.header[0] = 9;
+    print_int(block.header[0]);
 }
 EOF
 
-############################################################
-# 823_10.c – sub-region before another, with off-by-one stride
-############################################################
+########################################
+# 823_10.c
+########################################
 cat > "${OUT_DIR}/823_10.c" <<'EOF'
-volatile int sink;
+/* 823_10.c – CWE-823: pointer walks from heap into unrelated globals */
 
-static int area[96];
+#define WASM_PAGE_SIZE 0x10000
+
+extern unsigned char __heap_base[];
+extern void print_int(int);
+
+static int globals_a[4];
+static int globals_b[4];
 
 void start(void) {
-    int *front = &area[16];  /* [16..31] */
-    int *back  = &area[32];  /* [32..47] */
-    int i;
+    int num_pages = __builtin_wasm_memory_size(0);
+    unsigned char *heap_base = __heap_base;
 
-    for (i = 0; i < 16; i++) {
-        front[i] = 900 + i;
-        back[i]  = 1000 + i;
+    print_int(num_pages);
+    print_int((int)heap_base);
+
+    for (int i = 0; i < 4; i++) {
+        globals_a[i] = i;
+        globals_b[i] = 100 + i;
     }
 
-    /* Incorrect stepping: skips by 3 instead of 1 in the front region. */
-    int idx = 0;
-    while (idx < 8) {
-        front[idx] = 0x1234;
-        idx += 3;  /* jumps beyond 16 after a few iterations */
-    }
+    /* Start in the heap region. */
+    volatile int *base = (int *)heap_base;
 
-    /* Final write beyond intended region front, still in area. */
-    int *p = front + 20;
-    *p = 0x8888;
+    /*
+     * Misuse: assume globals are “one page after” heap_base.
+     * This fabricates a cross-region pointer that is out-of-range
+     * relative to the capability region.
+     */
+    volatile int *bad = (int *)(heap_base + WASM_PAGE_SIZE * num_pages);
+    bad += 8;  /* additional word offset */
 
-    sink = back[0];
+    *bad = 0x82300010;
+
+    print_int(globals_a[0]);
+    print_int(globals_b[0]);
 }
 EOF
 
-echo "Created 10 CWE-823 benchmarks in: ${OUT_DIR}"
+echo "Done."

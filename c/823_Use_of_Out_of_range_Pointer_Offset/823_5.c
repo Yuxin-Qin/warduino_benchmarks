@@ -1,24 +1,30 @@
-volatile int sink;
+/* 823_5.c – CWE-823: using page count as an array index directly */
 
-struct Block {
-    int header[4];   /* meta-data */
-    int payload[8];  /* logical region */
-    int trailer[4];  /* padding */
-};
+#define WASM_PAGE_SIZE 0x10000
 
-static struct Block blk;
+extern unsigned char __heap_base[];
+extern void print_int(int);
+
+static int table[32];
 
 void start(void) {
-    int *payload = blk.payload;
-    int i;
+    int num_pages = __builtin_wasm_memory_size(0);
+    unsigned char *heap_base = __heap_base;
 
-    for (i = 0; i < 8; i++) {
-        payload[i] = 300 + i;
+    print_int(num_pages);
+    print_int((int)heap_base);
+
+    /* Fill table with something deterministic. */
+    for (int i = 0; i < 32; i++) {
+        table[i] = i;
     }
 
-    /* Bug: code thinks payload has length 12 and writes into trailer. */
-    int *p = payload + 10;  /* crosses into blk.trailer */
-    *p = 0x3333;
+    /* Misuse: treat num_pages as a valid table index. */
+    int idx = num_pages;  /* Typically far beyond [0..31] */
+    volatile int *bad = &table[idx];
 
-    sink = blk.payload[0];
+    *bad = 0x82300005;  /* Out-of-range pointer offset use */
+
+    /* Keep a valid entry alive. */
+    print_int(table[0]);
 }

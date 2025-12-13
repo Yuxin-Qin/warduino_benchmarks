@@ -1,27 +1,38 @@
-volatile int sink;
+/* 823_10.c – CWE-823: pointer walks from heap into unrelated globals */
 
-static int area[96];
+#define WASM_PAGE_SIZE 0x10000
+
+extern unsigned char __heap_base[];
+extern void print_int(int);
+
+static int globals_a[4];
+static int globals_b[4];
 
 void start(void) {
-    int *front = &area[16];  /* [16..31] */
-    int *back  = &area[32];  /* [32..47] */
-    int i;
+    int num_pages = __builtin_wasm_memory_size(0);
+    unsigned char *heap_base = __heap_base;
 
-    for (i = 0; i < 16; i++) {
-        front[i] = 900 + i;
-        back[i]  = 1000 + i;
+    print_int(num_pages);
+    print_int((int)heap_base);
+
+    for (int i = 0; i < 4; i++) {
+        globals_a[i] = i;
+        globals_b[i] = 100 + i;
     }
 
-    /* Incorrect stepping: skips by 3 instead of 1 in the front region. */
-    int idx = 0;
-    while (idx < 8) {
-        front[idx] = 0x1234;
-        idx += 3;  /* jumps beyond 16 after a few iterations */
-    }
+    /* Start in the heap region. */
+    volatile int *base = (int *)heap_base;
 
-    /* Final write beyond intended region front, still in area. */
-    int *p = front + 20;
-    *p = 0x8888;
+    /*
+     * Misuse: assume globals are “one page after” heap_base.
+     * This fabricates a cross-region pointer that is out-of-range
+     * relative to the capability region.
+     */
+    volatile int *bad = (int *)(heap_base + WASM_PAGE_SIZE * num_pages);
+    bad += 8;  /* additional word offset */
 
-    sink = back[0];
+    *bad = 0x82300010;
+
+    print_int(globals_a[0]);
+    print_int(globals_b[0]);
 }

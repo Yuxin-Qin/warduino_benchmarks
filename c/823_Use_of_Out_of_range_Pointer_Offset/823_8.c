@@ -1,21 +1,35 @@
-volatile int sink;
+/* 823_8.c – CWE-823: loop gradually stepping pointer across boundary */
 
-static int global_arena[256];
+#define WASM_PAGE_SIZE 0x10000
+
+extern unsigned char __heap_base[];
+extern void print_int(int);
+
+static int ring[8];
 
 void start(void) {
-    /* Sub-region advertised to caller as length 32 starting at 64. */
-    int *sub = &global_arena[64];
-    int advertised_len = 32;
-    int i;
+    int num_pages = __builtin_wasm_memory_size(0);
+    unsigned char *heap_base = __heap_base;
 
-    for (i = 0; i < advertised_len; i++) {
-        sub[i] = 700 + i;
+    print_int(num_pages);
+    print_int((int)heap_base);
+
+    for (int i = 0; i < 8; i++) {
+        ring[i] = i;
     }
 
-    /* Caller miscalculates length and writes beyond end of sub-region. */
-    int wrong_len = advertised_len + 16;
-    int *p = sub + wrong_len;  /* still inside global_arena */
-    *p = 0x6666;
+    volatile int *p = ring;
 
-    sink = sub[0];
+    /* Step pointer in a loop, but stride is much too big. */
+    int step_words = (num_pages * (WASM_PAGE_SIZE / (int)sizeof(int))) / 2;
+
+    for (int k = 0; k < 3; k++) {
+        p = p + step_words;  /* eventually way outside ring[] */
+    }
+
+    /* Final out-of-range write. */
+    *p = 0x82300008;
+
+    /* Preserve one valid element. */
+    print_int(ring[0]);
 }

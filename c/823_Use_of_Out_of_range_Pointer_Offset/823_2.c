@@ -1,21 +1,28 @@
-volatile int sink;
+/* 823_2.c – CWE-823: off-by-one page offset beyond heap region */
 
-static int buffer[128];
+#define WASM_PAGE_SIZE 0x10000
+
+extern unsigned char __heap_base[];
+extern void print_int(int);
 
 void start(void) {
-    /* Define a logical window of length 8 inside buffer */
-    int *window = &buffer[32];
-    int logical_len = 8;
-    int i;
+    int num_pages = __builtin_wasm_memory_size(0);
+    unsigned char *heap_base = __heap_base;
 
-    for (i = 0; i < logical_len; i++) {
-        window[i] = i + 10;
-    }
+    print_int(num_pages);
+    print_int((int)heap_base);
 
-    /* Incorrect offset: write at index 12 instead of < 8.
-       Still within 'buffer', but outside logical window. */
-    int *p = window + 12;
-    *p = 777;
+    /* Compute pointer just past the end of linear memory. */
+    unsigned char *end_of_memory =
+        heap_base + num_pages * WASM_PAGE_SIZE;
 
-    sink = window[0];
+    /* Off-by-one page: one extra page beyond legal region. */
+    unsigned char *bad_byte_ptr = end_of_memory + WASM_PAGE_SIZE;
+    volatile int *bad = (int *)bad_byte_ptr;
+
+    *bad = 0x82300002;  /* Out-of-range write */
+
+    /* Touch heap_base to keep it live. */
+    heap_base[0] = 2;
+    print_int((int)heap_base[0]);
 }
