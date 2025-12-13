@@ -8,12 +8,28 @@ WASM_ROOT="$ROOT_DIR/wasm"
 
 mkdir -p "$WASM_ROOT"
 
-# Use wasi-sdk clang in ~/Projects/wasi-sdk-29.0-x86_64-macos by default
-: "${WASI_SDK_PATH:="$HOME/wasi-sdk-29.0-x86_64-macos"}"
+###############################################################################
+# Choose compiler
+###############################################################################
+# Preferred wasi-sdk location (you can override with WASI_SDK_PATH in env)
+: "${WASI_SDK_PATH:="$HOME/Projects/wasi-sdk-29.0-x86_64-macos"}"
 
-CC="$WASI_SDK_PATH/bin/clang"
+PREF_CC="$WASI_SDK_PATH/bin/clang"
+
+if [ -x "$PREF_CC" ]; then
+  CC="$PREF_CC"
+else
+  # Fallback to whatever 'clang' is in PATH
+  CC="$(command -v clang || true)"
+  if [ -z "$CC" ]; then
+    echo "Error: no usable clang found (neither $PREF_CC nor system clang)." >&2
+    exit 1
+  fi
+fi
+
+# You can override CFLAGS / WASM_TARGET via env if needed
 CFLAGS=${CFLAGS:--O2}
-WASM_TARGET="wasm32-wasi"
+WASM_TARGET="${WASM_TARGET:-wasm32}"
 
 echo "Source root : $SRC_ROOT"
 echo "Output root : $WASM_ROOT"
@@ -21,7 +37,9 @@ echo "Compiler    : $CC"
 echo "Target      : $WASM_TARGET"
 echo
 
+###############################################################################
 # Collect all .c files recursively under c/
+###############################################################################
 shopt -s nullglob
 cd "$SRC_ROOT"
 c_files=( $(find . -name '*.c' -print) )
@@ -33,6 +51,9 @@ if [ ${#c_files[@]} -eq 0 ]; then
   exit 0
 fi
 
+###############################################################################
+# Compile each .c → corresponding .wasm under wasm/ with mirrored dirs
+###############################################################################
 for rel in "${c_files[@]}"; do
   # rel is like ./823_Use_of_Out_of_range_Pointer_Offset/823_1.c
   src="$SRC_ROOT/$rel"
@@ -48,12 +69,14 @@ for rel in "${c_files[@]}"; do
 
   "$CC" \
     --target="$WASM_TARGET" \
+    -I"$SRC_ROOT" \
     -nostdlib \
     -Wl,--no-entry \
     -Wl,--export=start \
     -Wl,--allow-undefined \
     $CFLAGS \
     "$src" -o "$out"
+
 done
 
 echo

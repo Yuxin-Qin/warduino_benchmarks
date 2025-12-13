@@ -1,29 +1,22 @@
-/* 823_1.c – CWE-823: simple huge forward offset from heap_base */
 
-#define WASM_PAGE_SIZE 0x10000
+#include "wasm_layout.h"
 
-extern unsigned char __heap_base[];
-extern void print_int(int);
+volatile unsigned char sink;
 
 void start(void) {
-    int num_pages = __builtin_wasm_memory_size(0);
-    unsigned char *heap_base = __heap_base;
+    unsigned char *heap = wasm_heap_base();
+    int pages = wasm_pages();
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    /* Diagnostics: how big is memory, where is heap base. */
-    print_int(num_pages);
-    print_int((int)heap_base);
+    /* Base inside heap. */
+    unsigned char *base = heap + heap_len / 2;
 
-    /* Base pointer into heap, then a huge forward offset in bytes. */
-    volatile int *p = (int *)heap_base;
+    /* Compute an out-of-range offset deliberately beyond heap end. */
+    long offset = (long)heap_len;   /* moves pointer beyond heap upper bound */
 
-    /* Out-of-range pointer offset: stride crosses all pages and more. */
-    int byte_offset = num_pages * WASM_PAGE_SIZE + 128;
-    volatile int *bad = (int *)((unsigned char *)p + byte_offset);
+    unsigned char *p = base + offset;  /* out-of-range pointer offset */
 
-    /* Misuse: write through an out-of-range pointer offset. */
-    *bad = 0x82300001;
-
-    /* Keep p “live” so compiler does not optimise it away. */
-    *p = 1;
-    print_int(*p);
+    /* Single dereference; on CHERI this should fault, on non-CHERI it is UB. */
+    sink = *p;
 }
+

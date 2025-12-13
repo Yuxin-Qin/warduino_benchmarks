@@ -1,10 +1,23 @@
-/* CWE-119 variant 1 */
-volatile int sink;
+
+#include "wasm_layout.h"
+
+volatile unsigned char sink;
+
 void start(void) {
-    char buf[16];
-    int len = 16 + 1;  /* incorrectly assumes extra room */
-    for (int j = 0; j < len; j++) {
-        buf[j] = (char)j;   /* write may exceed buf[15] */
+    unsigned char *heap = wasm_heap_base();
+    int pages = wasm_pages();
+
+    /* Treat entire heap as one big buffer of length heap_len. */
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
+
+    /* Incorrect sanitised length: off by +16 beyond heap. */
+    unsigned long len = heap_len + 16;
+
+    /* Copy loop uses len as if it were safe. */
+    for (unsigned long i = 0; i < len; i++) {
+        heap[i] = (unsigned char)(i & 0xff);
     }
-    sink = buf[0];
+
+    sink = heap[0];
 }
+
