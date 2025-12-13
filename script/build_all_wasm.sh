@@ -72,11 +72,11 @@ for rel in "${c_files[@]}"; do
     -I"$SRC_ROOT" \
     -nostdlib \
     -Wl,--no-entry \
-    -Wl,--export=start \
+    -Wl,--export=all \
+    -Wno-implicit-function-declaration \
     -Wl,--allow-undefined \
     $CFLAGS \
     "$src" -o "$out"
-
 done
 
 echo
