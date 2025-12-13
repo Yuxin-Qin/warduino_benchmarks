@@ -10,8 +10,9 @@ WASM_ROOT="${ROOT_DIR}/wasm"
 OUT_CSV="${ROOT_DIR}/results_winter.csv"
 
 # WDCLI binary
+# Default: $HOME/WARDuino/build-emu/wdcli
 # Override with: WDCLI=/path/to/wdcli ./run_all_winter.sh
-WDCLI="${WDCLI:-wdcli}"
+WDCLI="${WDCLI:-"$HOME/WARDuino/build-emu/wdcli"}"
 
 # Timeout command (GNU coreutils) – adjust if your distro uses a different path
 TIMEOUT_CMD="${TIMEOUT_CMD:-timeout}"
