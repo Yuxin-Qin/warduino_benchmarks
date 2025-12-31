@@ -6,14 +6,13 @@ void start(void) {
     int i;
 
     for (i = 0; i < 16; i++) {
-        buf[i] = 0;
+        buf[i] = i;
     }
 
-    /* Underwrite: for i < 8, we write before buf[0]. */
+    /* Under-read: for i < 8, we read before buf[0]. */
     for (i = 0; i < 16; i++) {
-        p[i - 8] = i;   /* buf[-8]..buf[7] on first half of loop */
+        int v = p[i - 8];  /* buf[-8]..buf[7] */
+        sink = v;
     }
-
-    sink = buf[8];
 }
 

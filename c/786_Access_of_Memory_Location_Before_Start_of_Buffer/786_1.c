@@ -1,25 +1,18 @@
-
-#include "wasm_layout.h"
-
-volatile unsigned char sink;
+volatile int sink;
 
 void start(void) {
-    unsigned char *heap = wasm_heap_base();
-    int pages = wasm_pages();
-    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
+    int buf[16];
+    int *p = &buf[4];
+    int i;
 
-    /* Define a buffer window that starts well inside heap. */
-    unsigned long offset = heap_len / 2;
-    unsigned long size   = 256;
-
-    unsigned char *buf = heap + offset;
-
-    /* Indexing uses signed index and allows negative values. */
-    for (int i = -64; i < (int)size; i++) {
-        unsigned char *p = buf + i;  /* for i < 0, p < buf */
-        *p = (unsigned char)(i & 0xff);
+    for (i = 0; i < 16; i++) {
+        buf[i] = i;
     }
 
-    sink = buf[0];
+    /* Access before start of buffer using negative index. */
+    for (i = -4; i < 4; i++) {
+        int v = p[i];   /* for i < 0, p[i] is before buf[0] */
+        sink = v;
+    }
 }
 

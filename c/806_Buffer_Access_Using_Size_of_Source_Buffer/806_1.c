@@ -1,31 +1,19 @@
-
-#include "wasm_layout.h"
-
-volatile unsigned char sink;
+volatile int sink;
 
 void start(void) {
-    unsigned char *heap = wasm_heap_base();
-    int pages = wasm_pages();
-    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
+    int src[32];
+    int dst[8];
+    int i;
 
-    /* Two buffers: small dst, large src. */
-    unsigned long dst_size = 256;
-    unsigned long src_size = 1024;
-
-    unsigned long dst_off = heap_len / 8;
-    unsigned long src_off = dst_off + dst_size;  /* src right after dst */
-
-    unsigned char *dst = heap + dst_off;
-    unsigned char *src = heap + src_off;
-
-    /* Initialise src. */
-    for (unsigned long i = 0; i < src_size; i++) {
-        src[i] = (unsigned char)(i & 0xff);
+    for (i = 0; i < 32; i++) {
+        src[i] = i;
     }
 
-    /* Bug: copy using src_size instead of dst_size. */
-    for (unsigned long i = 0; i < src_size; i++) {
-        dst[i] = src[i];  /* writes past dst, potentially off end of heap */
+    /* Uses size of source array to index destination. */
+    int src_size = 32;
+
+    for (i = 0; i < src_size; i++) {
+        dst[i] = src[i];  /* out-of-bounds for i >= 8 */
     }
 
     sink = dst[0];
