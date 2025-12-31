@@ -1,20 +1,16 @@
-
-#include "wasm_layout.h"
-
-volatile unsigned char sink;
+volatile int sink;
 
 void start(void) {
-    unsigned char *heap = wasm_heap_base();
-    int pages = wasm_pages();
-    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
+    int buf[16];
+    int i;
 
-    /* buffer is last 1 KiB of heap */
-    unsigned long buf_size = 1024;
-    unsigned char *buf = heap + heap_len - buf_size;
+    for (i = 0; i < 16; i++) {
+        buf[i] = 0;
+    }
 
-    /* Incorrect loop bound: writes buf_size + 64 bytes. */
-    for (unsigned long i = 0; i < buf_size + 64; i++) {
-        buf[i] = (unsigned char)(i & 0xff);
+    /* Out-of-bounds write beyond end of array. */
+    for (i = 0; i < 40; i++) {
+        buf[i] = i;    /* writes out of bounds when i >= 16 */
     }
 
     sink = buf[0];
