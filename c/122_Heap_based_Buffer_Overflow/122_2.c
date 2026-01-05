@@ -1,46 +1,19 @@
 #include "wasm_layout.h"
+extern void print_int(int);
 
-static unsigned char *heap_ptr = 0;
-
-static void init_heap(void) {
-    if (!heap_ptr) {
-        heap_ptr = wasm_heap_base();
-    }
-}
-
-static void *my_alloc(unsigned long bytes) {
-    init_heap();
-    unsigned char *p = heap_ptr;
-    heap_ptr += bytes;  /* no heap bound check */
-    return (void *)p;
-}
-
-/*
- * CWE-122:
- * Allocate a message buffer but copy more bytes than allocated.
- */
+/* Simple bump "allocator" that ignores remaining heap and overruns it. */
 void start(void) {
-    unsigned char *src;
-    unsigned char *dst;
-    unsigned long  alloc_size = 32;
-    unsigned long  to_copy    = 64;
-    int            sum        = 0;
+    unsigned char *heap = wasm_heap_base();
+    int pages = wasm_pages();
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    src = (unsigned char *)my_alloc(64);
-    dst = (unsigned char *)my_alloc(alloc_size);
+    unsigned char *heap_end = heap + heap_len;
+    unsigned char *p = heap_end - 128;  /* pretend last allocation */
 
-    for (unsigned long i = 0; i < 64; i++) {
-        src[i] = (unsigned char)(i & 0xff);
+    unsigned long requested = 512;      /* too big for remaining heap */
+    for (unsigned long i = 0; i < requested; i++) {
+        p[i] = (unsigned char)(i & 0xff);  /* crosses linear memory end */
     }
 
-    /* Overflow dst. */
-    for (unsigned long i = 0; i < to_copy; i++) {
-        dst[i] = src[i];
-    }
-
-    for (unsigned long i = 0; i < alloc_size; i++) {
-        sum += dst[i];
-    }
-
-    print_int(sum);
+    print_int(p[0]);
 }

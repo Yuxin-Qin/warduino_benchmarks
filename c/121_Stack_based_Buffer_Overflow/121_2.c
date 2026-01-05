@@ -1,30 +1,20 @@
 #include "wasm_layout.h"
+extern void print_int(int);
 
-/*
- * CWE-121:
- * Build a stack log message and append a tag,
- * but never check the destination size.
- */
+/* Emulates a stack at the end of linear memory and pushes past it. */
 void start(void) {
-    char log_buf[32];
-    char tag[48];
-    int  acc = 0;
+    unsigned char *heap = wasm_heap_base();
+    int pages = wasm_pages();
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    for (int i = 0; i < 32; i++) {
-        log_buf[i] = 'A';
-    }
-    for (int i = 0; i < 48; i++) {
-        tag[i] = (char)('a' + (i % 26));
-    }
+    unsigned long stack_size = 256;
+    unsigned char *stack_base = heap + heap_len - stack_size;
+    unsigned char *sp = stack_base;
 
-    /* Overflow log_buf. */
-    for (int i = 0; i < 48; i++) {
-        log_buf[i] = tag[i];
+    /* Missing stack-limit check: pushes way beyond heap end. */
+    for (unsigned long i = 0; i < heap_len; i++) {
+        *sp++ = (unsigned char)(i & 0xff);
     }
 
-    for (int i = 0; i < 32; i++) {
-        acc += (int)log_buf[i];
-    }
-
-    print_int(acc);
+    print_int(stack_base[0]);
 }

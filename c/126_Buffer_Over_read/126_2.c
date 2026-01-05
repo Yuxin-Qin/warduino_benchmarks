@@ -1,25 +1,19 @@
 #include "wasm_layout.h"
+extern void print_int(int);
 
-/*
- * CWE-126:
- * Copy full capacity even though only 'received' bytes are valid.
- */
+/* "Scan" past a logical buffer end into unmapped memory. */
 void start(void) {
-    unsigned char src[64];
-    unsigned char dst[64];
-    int           received = 20;
-    int           sum      = 0;
+    unsigned char *heap = wasm_heap_base();
+    int pages = wasm_pages();
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    for (int i = 0; i < 64; i++) {
-        src[i] = (unsigned char)(i & 0xff);
-    }
+    unsigned char *buf = heap + heap_len / 2;
+    unsigned long logical_len = 64;
+    unsigned long scan_len = heap_len;  /* badly larger */
 
-    for (int i = 0; i < 64; i++) {  /* should use received */
-        dst[i] = src[i];
-    }
-
-    for (int i = 0; i < 64; i++) {
-        sum += dst[i];
+    int sum = 0;
+    for (unsigned long i = 0; i < scan_len; i++) {
+        sum += buf[i];  /* crosses end of linear memory */
     }
 
     print_int(sum);

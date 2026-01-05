@@ -1,26 +1,18 @@
 #include "wasm_layout.h"
+extern void print_int(int);
 
-/*
- * CWE-131:
- * Mis-sized path buffer; no room for full string.
- */
+/* Treats heap as array of 8-byte items but uses char indexing. */
 void start(void) {
-    char base[8]   = {'/','a','p','p','/',0,0,0};
-    char suffix[8] = {'l','o','g','.','t','x','t',0};
-    char path[12];
-    int  i, idx = 0;
-    int  acc = 0;
+    unsigned char *heap = wasm_heap_base();
+    int pages = wasm_pages();
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    for (i = 0; i < 8 && base[i] != 0; i++) {
-        path[idx++] = base[i];
-    }
-    for (i = 0; i < 8 && suffix[i] != 0; i++) {
-        path[idx++] = suffix[i];  /* may overflow path */
+    unsigned long items = heap_len / 8;   /* "element count" */
+    unsigned long bytes_to_write = items * 8 + 64;  /* off by +64 */
+
+    for (unsigned long i = 0; i < bytes_to_write; i++) {
+        heap[i] = (unsigned char)(i & 0xff);  /* overruns end of heap */
     }
 
-    for (i = 0; i < 12; i++) {
-        acc += (int)path[i];
-    }
-
-    print_int(acc);
+    print_int(heap[0]);
 }

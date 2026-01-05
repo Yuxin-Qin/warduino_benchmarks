@@ -1,27 +1,19 @@
 #include "wasm_layout.h"
+extern void print_int(int);
 
-static int process_payload(unsigned char *buf, unsigned long len) {
-    int sum = 0;
-    for (unsigned long i = 0; i < len; i++) {
-        sum += buf[i];
-    }
-    return sum;
-}
-
-/*
- * CWE-805:
- * Caller passes length too large; callee trusts it.
- */
+/* Passes total heap_len instead of logical length for a sub-buffer. */
 void start(void) {
-    unsigned char buf[32];
-    unsigned long real_len  = 16;
-    unsigned long wrong_len = 64;
-    (void)real_len;
+    unsigned char *heap = wasm_heap_base();
+    int pages = wasm_pages();
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    for (int i = 0; i < 32; i++) {
-        buf[i] = (unsigned char)(i & 0xff);
+    unsigned char *buf = heap + heap_len / 2;
+    unsigned long logical_len = 128;
+    unsigned long length_param = heap_len;  /* wrong */
+
+    for (unsigned long i = 0; i < length_param; i++) {
+        buf[i] = (unsigned char)(i & 0xff);  /* out of heap range */
     }
 
-    int result = process_payload(buf, wrong_len);
-    print_int(result);
+    print_int(buf[0]);
 }

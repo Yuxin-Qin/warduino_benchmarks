@@ -1,28 +1,26 @@
 #include "wasm_layout.h"
+extern void print_int(int);
 
-/*
- * CWE-120:
- * Copy a "received packet" into a small fixed-size stack buffer,
- * using the packet length directly without checking against dest size.
- */
+static void copy_unchecked(unsigned char *dst,
+                           const unsigned char *src,
+                           unsigned long len) {
+    for (unsigned long i = 0; i < len; i++) {
+        dst[i] = src[i];
+    }
+}
+
 void start(void) {
-    unsigned char packet[64];
-    unsigned char dest[16];
-    int           input_len = 64;  /* "received" length */
-    int           checksum  = 0;
+    unsigned char *heap = wasm_heap_base();
+    int pages = wasm_pages();
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    for (int i = 0; i < 64; i++) {
-        packet[i] = (unsigned char)(i & 0xff);
-    }
+    unsigned char *src = heap;
+    unsigned char *dst = heap + heap_len / 2;
 
-    /* Vulnerable: blindly uses input_len. */
-    for (int i = 0; i < input_len; i++) {
-        dest[i] = packet[i];  /* overflow dest */
-    }
+    /* "User length" not checked against buffer size. */
+    unsigned long user_len = heap_len + 32;  /* definitely past end */
 
-    for (int i = 0; i < 16; i++) {
-        checksum += dest[i];
-    }
+    copy_unchecked(dst, src, user_len);
 
-    print_int(checksum);
+    print_int(dst[0]);
 }

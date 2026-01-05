@@ -1,21 +1,22 @@
 #include "wasm_layout.h"
+extern void print_int(int);
 
-/*
- * CWE-129:
- * Only checks index >= 0, not < size.
- */
+/* Uses an index derived from heap size without clamping to array size. */
 void start(void) {
-    int sensor_values[8];
-    int sensor_id = 15;
-    int reading   = -1;
+    unsigned char *heap = wasm_heap_base();
+    int pages = wasm_pages();
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    for (int i = 0; i < 8; i++) {
-        sensor_values[i] = i * 10;
+    /* Place array near the very end of heap. */
+    unsigned long arr_size = 64;
+    unsigned char *arr = heap + heap_len - arr_size;
+
+    unsigned long idx = heap_len / 2;  /* nonsensical, far too large */
+
+    /* "Validate" index incorrectly: only checks idx >= 0. */
+    if ((long)idx >= 0) {
+        arr[idx] = 0x29;  /* out-of-bounds write beyond linear memory */
     }
 
-    if (sensor_id >= 0) {
-        reading = sensor_values[sensor_id];  /* out-of-bounds */
-    }
-
-    print_int(reading);
+    print_int(arr[0]);
 }

@@ -1,21 +1,17 @@
 #include "wasm_layout.h"
+extern void print_int(int);
 
-/*
- * CWE-823:
- * Compute pointer beyond entire heap and dereference once.
- */
-static volatile unsigned char sink;
-
+/* Builds a pointer by adding a huge offset to a base inside heap. */
 void start(void) {
-    unsigned char *heap     = wasm_heap_base();
-    int            pages    = wasm_pages();
-    unsigned long  heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
+    unsigned char *heap = wasm_heap_base();
+    int pages = wasm_pages();
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
     unsigned char *base = heap + heap_len / 2;
-    long           offset = (long)heap_len;
+    unsigned long offset = heap_len;  /* out-of-range offset */
 
-    unsigned char *p = base + offset;  /* out-of-range offset */
+    unsigned char *p = base + offset;  /* definitely beyond linear memory */
+    int v = *p;  /* out-of-range pointer dereference */
 
-    sink = *p;
-    print_int(pages);
+    print_int(v);
 }

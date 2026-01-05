@@ -1,25 +1,19 @@
 #include "wasm_layout.h"
+extern void print_int(int);
 
-/*
- * CWE-786:
- * Window in middle of heap; loop uses negative index.
- */
+/* Buffer logically starts in the middle of heap, but we step backwards
+   beyond heap base. */
 void start(void) {
-    unsigned char *heap     = wasm_heap_base();
-    int            pages    = wasm_pages();
-    unsigned long  heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
+    unsigned char *heap = wasm_heap_base();
+    int pages = wasm_pages();
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    unsigned long  offset = heap_len / 2;
-    unsigned char *window = heap + offset;
-    int            sum    = 0;
+    unsigned char *buf = heap + heap_len / 2;
+    int sum = 0;
 
-    for (int i = 0; i < 256; i++) {
-        window[i] = (unsigned char)(i & 0xff);
-    }
-
-    for (int i = -32; i < 64; i++) {
-        unsigned char *p = window + i;  /* may underflow window */
-        sum += *p;
+    for (int i = 0; i < 512; i++) {
+        unsigned char *p = buf - (unsigned long)i;
+        sum += *p;  /* for large i, p < heap base */
     }
 
     print_int(sum);

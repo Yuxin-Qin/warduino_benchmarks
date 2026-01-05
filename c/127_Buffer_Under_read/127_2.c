@@ -1,22 +1,17 @@
 #include "wasm_layout.h"
+extern void print_int(int);
 
-/*
- * CWE-127:
- * Sliding read window index goes negative conceptually.
- */
+/* Reads before the start of a heap buffer, below heap base. */
 void start(void) {
-    unsigned char buf[32];
-    int           start_index = 8;
-    int           sum         = 0;
+    unsigned char *heap = wasm_heap_base();
+    (void)wasm_pages();
 
-    for (int i = 0; i < 32; i++) {
-        buf[i] = (unsigned char)(i & 0xff);
-    }
+    unsigned char *buf = heap + 256;
+    int sum = 0;
 
-    start_index -= 16;  /* becomes negative logically */
-
-    for (int i = start_index; i < start_index + 10; i++) {
-        sum += buf[i];  /* under-read for i < 0 in C semantics */
+    for (int i = -64; i < 64; i++) {
+        unsigned char *p = buf + i;
+        sum += *p;   /* for i<0, dereference < heap base */
     }
 
     print_int(sum);

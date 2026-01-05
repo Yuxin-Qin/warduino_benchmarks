@@ -1,23 +1,14 @@
 #include "wasm_layout.h"
+extern void print_int(int);
 
-/*
- * CWE-788:
- * Read terminator one past end of buffer.
- */
+/* Reads just past the end of heap. */
 void start(void) {
-    unsigned char buf[16];
-    int           acc = 0;
+    unsigned char *heap = wasm_heap_base();
+    int pages = wasm_pages();
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    for (int i = 0; i < 16; i++) {
-        buf[i] = (unsigned char)(i & 0xff);
-    }
+    unsigned char *past_end = heap + heap_len;
+    int v = past_end[1];  /* one byte after heap end */
 
-    unsigned char terminator = buf[16];  /* out-of-bounds read */
-    acc += (int)terminator;
-
-    for (int i = 0; i < 16; i++) {
-        acc += buf[i];
-    }
-
-    print_int(acc);
+    print_int(v);
 }

@@ -1,26 +1,17 @@
 #include "wasm_layout.h"
+extern void print_int(int);
 
-/*
- * CWE-124:
- * Sliding window cursor moved too far backward, then written.
- */
+/* Writes before the beginning of the heap region. */
 void start(void) {
-    unsigned char window[32];
-    unsigned char *cursor = &window[8];
-    int sum = 0;
+    unsigned char *heap = wasm_heap_base();
+    (void)wasm_pages(); /* unused in this pattern */
 
-    for (int i = 0; i < 32; i++) {
-        window[i] = (unsigned char)i;
+    unsigned char *buf = heap + 256;
+    unsigned char *p = buf - 512;  /* definitely before heap base */
+
+    for (int i = 0; i < 64; i++) {
+        p[i] = (unsigned char)(i & 0xff);  /* underflow into unmapped region */
     }
 
-    cursor -= 16;  /* before window[0] */
-    for (int i = 0; i < 8; i++) {
-        cursor[i] = (unsigned char)(i + 100);
-    }
-
-    for (int i = 0; i < 32; i++) {
-        sum += window[i];
-    }
-
-    print_int(sum);
+    print_int(buf[0]);
 }

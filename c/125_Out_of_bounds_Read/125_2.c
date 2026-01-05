@@ -1,25 +1,14 @@
 #include "wasm_layout.h"
+extern void print_int(int);
 
-/*
- * CWE-125:
- * Scan payload for sentinel but ignore declared length.
- */
+/* Reads past the end of linear memory. */
 void start(void) {
-    unsigned char payload[32];
-    int           len   = 16;
-    int           found = -1;
+    unsigned char *heap = wasm_heap_base();
+    int pages = wasm_pages();
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    for (int i = 0; i < 32; i++) {
-        payload[i] = (unsigned char)(i & 0xff);
-    }
-    payload[10] = 0xAA;
+    unsigned char *p = heap + heap_len + 32;  /* beyond linear memory */
+    int v = p[0];  /* out-of-bounds read */
 
-    for (int i = 0; i < 32; i++) {  /* ignores len */
-        if (payload[i] == 0xAA) {
-            found = i;
-            break;
-        }
-    }
-
-    print_int(found);
+    print_int(v);
 }

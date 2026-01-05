@@ -1,26 +1,13 @@
 #include "wasm_layout.h"
+extern void print_int(int);
 
-/*
- * CWE-787:
- * Off-by-one log index check.
- */
+/* Single write exactly at heap_len and beyond. */
 void start(void) {
-    int  log_buf[16];
-    int  count = 16;
-    int  acc   = 0;
+    unsigned char *heap = wasm_heap_base();
+    int pages = wasm_pages();
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    for (int i = 0; i < 16; i++) {
-        log_buf[i] = i;
-    }
+    heap[heap_len] = 0x7;   /* write one byte beyond linear memory */
 
-    if (count <= 16) {
-        log_buf[count] = 999;  /* log_buf[16] is out-of-bounds */
-        count++;
-    }
-
-    for (int i = 0; i < 16; i++) {
-        acc += log_buf[i];
-    }
-
-    print_int(acc);
+    print_int((int)heap[0]);
 }
