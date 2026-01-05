@@ -1,7 +1,7 @@
-#define WASM_PAGE_SIZE 0x10000
+#define WASM_PAGE_SIZE 0x10000  /* 64 KiB */
 
 extern unsigned char __heap_base[];
-extern void print_string(const char *s, int len);
+extern void print_int(int);
 
 volatile unsigned char sink;
 
@@ -10,15 +10,9 @@ void start(void) {
     int pages = __builtin_wasm_memory_size(0);
     unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    /* Base inside heap. */
     unsigned char *base = heap + heap_len / 2;
+    long offset = (long)heap_len;  /* push pointer beyond heap upper bound */
 
-    /* Offset that walks beyond linear memory. */
-    long offset = (long)heap_len;
-
-    unsigned char *p = base + offset;  /* out-of-range pointer offset */
-
+    unsigned char *p = base + offset;
     sink = *p;
-
-    print_string("823_1 done\n", 11);
 }

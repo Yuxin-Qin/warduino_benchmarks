@@ -6,14 +6,21 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 WASM_ROOT="${ROOT_DIR}/wasm"
 
-# Output CSV
+# Output CSV on the winter machine
 OUT_CSV="${ROOT_DIR}/results_mac.csv"
 
-# WDCLI binary (override with: WDCLI=/path/to/wdcli ./run_all_wasm_mac.sh)
-WDCLI="${WDCLI:-wdcli}"
+# WDCLI binary
+# Default: $HOME/Projects/WARDuino/build-emu/wdcli
+# Override with: WDCLI=/path/to/wdcli ./run_all_winter.sh
+WDCLI="${WDCLI:-"$HOME/Projects/WARDuino/build-emu/wdcli"}"
+
+# Timeout command (GNU coreutils) – adjust if your distro uses a different path
+TIMEOUT_CMD="${TIMEOUT_CMD:-timeout}"
+TIME_LIMIT="${TIME_LIMIT:-5s}"
 
 echo "Wasm root : ${WASM_ROOT}"
 echo "WDCLI     : ${WDCLI}"
+echo "Timeout   : ${TIME_LIMIT}"
 echo "Output CSV: ${OUT_CSV}"
 echo
 
@@ -27,16 +34,22 @@ while IFS= read -r -d '' wasm_file; do
 
   echo "Running ${rel_path} ..."
 
-  # Run wdcli and capture *all* output (stdout+stderr)
-  if output="$("${WDCLI}" "${wasm_file}" --invoke start --no-debug 2>&1)"; then
+  # Run wdcli with timeout and capture *all* output (stdout+stderr)
+  output="$(${TIMEOUT_CMD} "${TIME_LIMIT}" "${WDCLI}" "${wasm_file}" --invoke start --no-debug 2>&1 || true)"
+  status=$?
+
+  if [ "${status}" -eq 0 ]; then
     # Exit status 0 → treat as no error
     err_msg=""
+  elif [ "${status}" -eq 124 ]; then
+    # 124 is the standard timeout exit code
+    err_msg="TIMEOUT (${TIME_LIMIT}): ${output}"
   else
     # Non-zero status → record entire output as error message
     err_msg="${output}"
   fi
 
-  # Normalise error text for CSV: remove newlines, escape quotes
+  # Normalise error text for CSV: remove newlines/CR, escape quotes
   err_msg="${err_msg//$'\r'/ }"
   err_msg="${err_msg//$'\n'/ }"
   err_msg="${err_msg//\"/\"\"}"

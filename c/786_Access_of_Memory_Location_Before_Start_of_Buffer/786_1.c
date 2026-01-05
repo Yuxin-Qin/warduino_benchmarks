@@ -1,17 +1,16 @@
-#define WASM_PAGE_SIZE 0x10000
+#define WASM_PAGE_SIZE 0x10000  /* 64 KiB */
 
 extern unsigned char __heap_base[];
-extern void print_string(const char *s, int len);
+extern void print_int(int);
+
+volatile unsigned char sink;
 
 void start(void) {
     unsigned char *heap = __heap_base;
-    unsigned long offset = 256;
-
-    unsigned char *buf = heap + offset;
+    unsigned char *buf = heap + 256;
 
     for (int i = -512; i < 0; i++) {
-        buf[i] = (unsigned char)(i & 0xff);
+        unsigned char *p = buf + i;  /* can go below linear memory start */
+        sink = *p;
     }
-
-    print_string("786_1 done\n", 11);
 }

@@ -1,18 +1,16 @@
-#define WASM_PAGE_SIZE 0x10000
+#define WASM_PAGE_SIZE 0x10000  /* 64 KiB */
 
 extern unsigned char __heap_base[];
-extern void print_string(const char *s, int len);
-
-static int table[32];
+extern void print_int(int);
 
 void start(void) {
+    unsigned char *heap = __heap_base;
     int pages = __builtin_wasm_memory_size(0);
-    for (int i = 0; i < 32; i++) {
-        table[i] = i;
-    }
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    /* Use pages directly as index, far beyond [0..31]. */
-    table[pages] = 0x12900001;
+    unsigned char *buf = heap;
+    int idx = (int)heap_len;  /* use page-derived value as index */
 
-    print_string("129_1 done\n", 11);
+    buf[idx] = 0x29;  /* well past linear memory */
+    print_int(buf[0]);
 }

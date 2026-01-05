@@ -1,465 +1,359 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Root paths (repo root = parent of this script)
+# Root of the repo (script is in ./script)
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd)"
-SRC_ROOT="$ROOT_DIR/c"
+SRC_ROOT="${ROOT_DIR}/c"
 
-mkdir -p "$SRC_ROOT"
+mkdir -p "${SRC_ROOT}"
 
-mk() {
+# Helper: make dir and write a single C file via here-doc
+write_c() {
   local dir="$1"
   local file="$2"
-  mkdir -p "$SRC_ROOT/$dir"
-  cat > "$SRC_ROOT/$dir/$file.c" <<'EOF'
-EOF
-}
+  local body="$3"
 
-########################
-# 119 – Improper Restriction of Operations within the Bounds of a Memory Buffer
-########################
-mkdir -p "$SRC_ROOT/119_Improper_Restriction_of_Operations_within_the_Bounds_of_a_Memory_Buffer"
-cat > "$SRC_ROOT/119_Improper_Restriction_of_Operations_within_the_Bounds_of_a_Memory_Buffer/119_1.c" <<'EOF'
-#define WASM_PAGE_SIZE 0x10000
+  mkdir -p "${SRC_ROOT}/${dir}"
+  cat > "${SRC_ROOT}/${dir}/${file}" <<'EOF'
+#define WASM_PAGE_SIZE 0x10000  /* 64 KiB */
 
 extern unsigned char __heap_base[];
 extern void print_int(int);
-extern void print_string(const char *s, int len);
 
-void start(void) {
+EOF
+  # append the specific body
+  printf "%s\n" "${body}" >> "${SRC_ROOT}/${dir}/${file}"
+}
+
+############################
+# 119 – Improper Restriction
+############################
+
+write_c \
+  "119_Improper_Restriction_of_Operations_within_the_Bounds_of_a_Memory_Buffer" \
+  "119_1.c" \
+'void start(void) {
     unsigned char *heap = __heap_base;
     int pages = __builtin_wasm_memory_size(0);
     unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    /* Incorrect bound: allow writes slightly beyond linear memory. */
-    unsigned long len = heap_len + 16;
+    print_int(pages);
+    print_int((int)heap);
 
+    unsigned long len = heap_len + 16;
     for (unsigned long i = 0; i < len; i++) {
         heap[i] = (unsigned char)(i & 0xff);
     }
+}'
 
-    print_string("119_1 done\n", 11);
-}
-EOF
+############################
+# 120 – Classic buffer copy
+############################
 
-########################
-# 120 – Buffer Copy without Checking Size of Input
-########################
-mkdir -p "$SRC_ROOT/120_Buffer_Copy_without_Checking_Size_of_Input"
-cat > "$SRC_ROOT/120_Buffer_Copy_without_Checking_Size_of_Input/120_1.c" <<'EOF'
-#define WASM_PAGE_SIZE 0x10000
-
-extern unsigned char __heap_base[];
-extern void print_string(const char *s, int len);
-
-void start(void) {
+write_c \
+  "120_Buffer_Copy_without_Checking_Size_of_Input" \
+  "120_1.c" \
+'void start(void) {
     unsigned char *heap = __heap_base;
     int pages = __builtin_wasm_memory_size(0);
     unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    unsigned char *dst = heap + (heap_len / 2);
+    unsigned char *dst = heap + heap_len / 2;
     unsigned char *src = heap;
 
-    /* Copy beyond end of linear memory. */
-    unsigned long len = (heap_len / 2) + 32;
-
-    for (unsigned long i = 0; i < len; i++) {
+    unsigned long copy_len = heap_len;  /* overflows beyond end of heap */
+    for (unsigned long i = 0; i < copy_len; i++) {
         dst[i] = src[i];
     }
 
-    print_string("120_1 done\n", 11);
-}
-EOF
+    print_int(dst[0]);
+}'
 
-########################
-# 121 – Stack-based Buffer Overflow
-# (simulated via linear memory region treated like a stack)
-########################
-mkdir -p "$SRC_ROOT/121_Stack_based_Buffer_Overflow"
-cat > "$SRC_ROOT/121_Stack_based_Buffer_Overflow/121_1.c" <<'EOF'
-#define WASM_PAGE_SIZE 0x10000
+############################
+# 121 – Stack-based overflow (simulated in linear memory)
+############################
 
-extern unsigned char __heap_base[];
-extern void print_string(const char *s, int len);
-
-void start(void) {
+write_c \
+  "121_Stack_based_Buffer_Overflow" \
+  "121_1.c" \
+'void start(void) {
     unsigned char *heap = __heap_base;
     int pages = __builtin_wasm_memory_size(0);
     unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    /* Treat top quarter of heap as "stack frame". */
-    unsigned char *frame = heap + (heap_len * 3) / 4;
-    unsigned long frame_size = heap_len / 8;
+    unsigned char *stack_frame = heap + heap_len - 32;
 
-    /* Overflow frame upward past end of memory. */
-    for (unsigned long i = 0; i < frame_size + 64; i++) {
-        frame[i] = (unsigned char)(i & 0xff);
+    for (int i = 0; i < 64; i++) {
+        stack_frame[i] = (unsigned char)i;  /* writes past end of linear memory */
     }
 
-    print_string("121_1 done\n", 11);
-}
-EOF
+    print_int(stack_frame[0]);
+}'
 
-########################
-# 122 – Heap-based Buffer Overflow
-########################
-mkdir -p "$SRC_ROOT/122_Heap_based_Buffer_Overflow"
-cat > "$SRC_ROOT/122_Heap_based_Buffer_Overflow/122_1.c" <<'EOF'
-#define WASM_PAGE_SIZE 0x10000
+############################
+# 122 – Heap-based overflow
+############################
 
-extern unsigned char __heap_base[];
-extern void print_string(const char *s, int len);
-
-static unsigned char *fake_heap = 0;
-static unsigned long fake_size  = 0;
-
-static unsigned char *my_malloc(unsigned long n) {
-    if (!fake_heap) {
-        fake_heap = __heap_base;
-        int pages = __builtin_wasm_memory_size(0);
-        fake_size = (unsigned long)pages * WASM_PAGE_SIZE;
-    }
-    return fake_heap; /* one big region */
-}
-
-void start(void) {
-    unsigned char *buf = my_malloc(64);
-    unsigned long n = fake_size + 32; /* overflow beyond allocated region */
-
-    for (unsigned long i = 0; i < n; i++) {
-        buf[i] = (unsigned char)(i & 0xff);
-    }
-
-    print_string("122_1 done\n", 11);
-}
-EOF
-
-########################
-# 124 – Buffer Underwrite (Buffer Underflow)
-########################
-mkdir -p "$SRC_ROOT/124_Buffer_Underwrite"
-cat > "$SRC_ROOT/124_Buffer_Underwrite/124_1.c" <<'EOF'
-#define WASM_PAGE_SIZE 0x10000
-
-extern unsigned char __heap_base[];
-extern void print_string(const char *s, int len);
-
-void start(void) {
-    unsigned char *heap = __heap_base;
-    unsigned char *buf  = heap + 128;
-
-    /* Write before start of buffer; if heap == linear start this may
-       also cross below linear memory on small configs. */
-    for (int i = -256; i < 0; i++) {
-        buf[i] = (unsigned char)(i & 0xff);
-    }
-
-    print_string("124_1 done\n", 11);
-}
-EOF
-
-########################
-# 125 – Out-of-bounds Read
-########################
-mkdir -p "$SRC_ROOT/125_Out_of_bounds_Read"
-cat > "$SRC_ROOT/125_Out_of_bounds_Read/125_1.c" <<'EOF'
-#define WASM_PAGE_SIZE 0x10000
-
-extern unsigned char __heap_base[];
-extern void print_int(int);
-extern void print_string(const char *s, int len);
-
-void start(void) {
+write_c \
+  "122_Heap_based_Buffer_Overflow" \
+  "122_1.c" \
+'void start(void) {
     unsigned char *heap = __heap_base;
     int pages = __builtin_wasm_memory_size(0);
     unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    for (unsigned long i = 0; i < heap_len; i++) {
-        heap[i] = (unsigned char)(i & 0xff);
+    unsigned char *heap_obj = heap + heap_len / 4;
+    unsigned long obj_size = heap_len / 2;
+
+    for (unsigned long i = 0; i < obj_size + 128; i++) {
+        heap_obj[i] = (unsigned char)(i & 0xff);
     }
 
-    /* Read past end of linear memory. */
-    unsigned char v = heap[heap_len + 8];
-    print_int((int)v);
+    print_int(heap_obj[0]);
+}'
 
-    print_string("125_1 done\n", 11);
-}
-EOF
+############################
+# 124 – Buffer underwrite
+############################
 
-########################
-# 126 – Buffer Over-read
-########################
-mkdir -p "$SRC_ROOT/126_Buffer_Over_read"
-cat > "$SRC_ROOT/126_Buffer_Over_read/126_1.c" <<'EOF'
-#define WASM_PAGE_SIZE 0x10000
-
-extern unsigned char __heap_base[];
-extern void print_int(int);
-extern void print_string(const char *s, int len);
-
-void start(void) {
+write_c \
+  "124_Buffer_Underwrite" \
+  "124_1.c" \
+'void start(void) {
     unsigned char *heap = __heap_base;
     int pages = __builtin_wasm_memory_size(0);
     unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    unsigned char *buf = heap + (heap_len / 4);
-    unsigned long len  = (heap_len / 4) + 32;
-
-    for (unsigned long i = 0; i < len; i++) {
-        unsigned char v = buf[i];
-        print_int((int)v);
-    }
-
-    print_string("126_1 done\n", 11);
-}
-EOF
-
-########################
-# 127 – Buffer Under-read
-########################
-mkdir -p "$SRC_ROOT/127_Buffer_Under_read"
-cat > "$SRC_ROOT/127_Buffer_Under_read/127_1.c" <<'EOF'
-#define WASM_PAGE_SIZE 0x10000
-
-extern unsigned char __heap_base[];
-extern void print_int(int);
-extern void print_string(const char *s, int len);
-
-void start(void) {
-    unsigned char *heap = __heap_base;
-    unsigned char *buf  = heap + 64;
+    unsigned char *buf = heap + heap_len / 2;
 
     for (int i = -64; i < 64; i++) {
-        unsigned char *p = buf + i;
-        unsigned char v  = *p;
-        print_int((int)v);
+        unsigned char *p = buf + i;   /* for i<0, p < heap_base → underflow */
+        *p = (unsigned char)(i & 0xff);
     }
 
-    print_string("127_1 done\n", 11);
-}
-EOF
+    print_int(buf[0]);
+}'
 
-########################
-# 129 – Improper Validation of Array Index
-########################
-mkdir -p "$SRC_ROOT/129_Improper_Validation_of_Array_Index"
-cat > "$SRC_ROOT/129_Improper_Validation_of_Array_Index/129_1.c" <<'EOF'
-#define WASM_PAGE_SIZE 0x10000
+############################
+# 125 – Out-of-bounds read
+############################
 
-extern unsigned char __heap_base[];
-extern void print_string(const char *s, int len);
-
-static int table[32];
-
-void start(void) {
-    int pages = __builtin_wasm_memory_size(0);
-    for (int i = 0; i < 32; i++) {
-        table[i] = i;
-    }
-
-    /* Use pages directly as index, far beyond [0..31]. */
-    table[pages] = 0x12900001;
-
-    print_string("129_1 done\n", 11);
-}
-EOF
-
-########################
-# 131 – Incorrect Calculation of Buffer Size
-########################
-mkdir -p "$SRC_ROOT/131_Incorrect_Calculation_of_Buffer_Size"
-cat > "$SRC_ROOT/131_Incorrect_Calculation_of_Buffer_Size/131_1.c" <<'EOF'
-#define WASM_PAGE_SIZE 0x10000
-
-extern unsigned char __heap_base[];
-extern void print_string(const char *s, int len);
+write_c \
+  "125_Out_of_bounds_Read" \
+  "125_1.c" \
+'volatile unsigned char sink;
 
 void start(void) {
     unsigned char *heap = __heap_base;
     int pages = __builtin_wasm_memory_size(0);
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    /* Wrong size: assume only 1 page regardless of actual. */
-    unsigned long wrong_len = WASM_PAGE_SIZE;
+    unsigned char *p = heap + heap_len + 32;  /* clearly past end of linear mem */
+    sink = *p;
+}'
 
-    /* But still loop up to pages*page_size, possibly past real memory. */
-    unsigned long real_len = (unsigned long)pages * WASM_PAGE_SIZE;
+############################
+# 126 – Buffer over-read
+############################
 
-    for (unsigned long i = 0; i < real_len; i++) {
+write_c \
+  "126_Buffer_Over_read" \
+  "126_1.c" \
+'volatile unsigned char sink;
+
+void start(void) {
+    unsigned char *heap = __heap_base;
+    int pages = __builtin_wasm_memory_size(0);
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
+
+    unsigned char *buf = heap + heap_len / 2;
+    unsigned long len = heap_len / 2 + 64;
+
+    for (unsigned long i = 0; i < len; i++) {
+        sink = buf[i];
+    }
+}'
+
+############################
+# 127 – Buffer under-read
+############################
+
+write_c \
+  "127_Buffer_Under_read" \
+  "127_1.c" \
+'volatile unsigned char sink;
+
+void start(void) {
+    unsigned char *heap = __heap_base;
+    unsigned char *buf = heap + 128;
+
+    for (int i = -64; i < 0; i++) {
+        unsigned char *p = buf + i;  /* reads before start of buffer, may cross below heap */
+        sink = *p;
+    }
+}'
+
+############################
+# 129 – Improper index validation
+############################
+
+write_c \
+  "129_Improper_Validation_of_Array_Index" \
+  "129_1.c" \
+'void start(void) {
+    unsigned char *heap = __heap_base;
+    int pages = __builtin_wasm_memory_size(0);
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
+
+    unsigned char *buf = heap;
+    int idx = (int)heap_len;  /* use page-derived value as index */
+
+    buf[idx] = 0x29;  /* well past linear memory */
+    print_int(buf[0]);
+}'
+
+############################
+# 131 – Incorrect buffer size calc
+############################
+
+write_c \
+  "131_Incorrect_Calculation_of_Buffer_Size" \
+  "131_1.c" \
+'void start(void) {
+    unsigned char *heap = __heap_base;
+    int pages = __builtin_wasm_memory_size(0);
+
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
+    unsigned long buf_len  = heap_len + 256;  /* miscomputed size */
+
+    for (unsigned long i = 0; i < buf_len; i++) {
         heap[i] = (unsigned char)(i & 0xff);
     }
 
-    (void)wrong_len;
+    print_int(heap[0]);
+}'
 
-    print_string("131_1 done\n", 11);
-}
-EOF
+############################
+# 786 – Access before start
+############################
 
-########################
-# 786 – Access of Memory Location Before Start of Buffer
-########################
-mkdir -p "$SRC_ROOT/786_Access_of_Memory_Location_Before_Start_of_Buffer"
-cat > "$SRC_ROOT/786_Access_of_Memory_Location_Before_Start_of_Buffer/786_1.c" <<'EOF'
-#define WASM_PAGE_SIZE 0x10000
-
-extern unsigned char __heap_base[];
-extern void print_string(const char *s, int len);
+write_c \
+  "786_Access_of_Memory_Location_Before_Start_of_Buffer" \
+  "786_1.c" \
+'volatile unsigned char sink;
 
 void start(void) {
     unsigned char *heap = __heap_base;
-    unsigned long offset = 256;
-
-    unsigned char *buf = heap + offset;
+    unsigned char *buf = heap + 256;
 
     for (int i = -512; i < 0; i++) {
-        buf[i] = (unsigned char)(i & 0xff);
+        unsigned char *p = buf + i;  /* can go below linear memory start */
+        sink = *p;
     }
+}'
 
-    print_string("786_1 done\n", 11);
-}
-EOF
+############################
+# 787 – Out-of-bounds write
+############################
 
-########################
-# 787 – Out-of-bounds Write
-########################
-mkdir -p "$SRC_ROOT/787_Out_of_bounds_Write"
-cat > "$SRC_ROOT/787_Out_of_bounds_Write/787_1.c" <<'EOF'
-#define WASM_PAGE_SIZE 0x10000
-
-extern unsigned char __heap_base[];
-extern void print_string(const char *s, int len);
-
-void start(void) {
+write_c \
+  "787_Out_of_bounds_Write" \
+  "787_1.c" \
+'void start(void) {
     unsigned char *heap = __heap_base;
     int pages = __builtin_wasm_memory_size(0);
     unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
     for (unsigned long i = 0; i <= heap_len + 32; i++) {
-        heap[i] = (unsigned char)(i & 0xff);
+        heap[i] = (unsigned char)(i & 0xff);  /* last writes beyond linear memory */
     }
+}'
 
-    print_string("787_1 done\n", 11);
-}
-EOF
+############################
+# 788 – After end of buffer
+############################
 
-########################
-# 788 – Access of Memory Location After End of Buffer
-########################
-mkdir -p "$SRC_ROOT/788_Access_of_Memory_Location_After_End_of_Buffer"
-cat > "$SRC_ROOT/788_Access_of_Memory_Location_After_End_of_Buffer/788_1.c" <<'EOF'
-#define WASM_PAGE_SIZE 0x10000
-
-extern unsigned char __heap_base[];
-extern void print_int(int);
-extern void print_string(const char *s, int len);
+write_c \
+  "788_Access_of_Memory_Location_After_End_of_Buffer" \
+  "788_1.c" \
+'volatile unsigned char sink;
 
 void start(void) {
     unsigned char *heap = __heap_base;
     int pages = __builtin_wasm_memory_size(0);
     unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    unsigned char *buf = heap + (heap_len / 2);
-    unsigned long size  = 256;
+    unsigned long buf_len = heap_len / 2;
+    unsigned char *buf = heap;
 
-    for (unsigned long i = 0; i < size; i++) {
-        buf[i] = (unsigned char)(i & 0xff);
-    }
-
-    unsigned char v = buf[size + (heap_len / 2)]; /* well past end of heap */
-    print_int((int)v);
-
-    print_string("788_1 done\n", 11);
-}
-EOF
-
-########################
-# 805 – Buffer Access with Incorrect Length Value
-########################
-mkdir -p "$SRC_ROOT/805_Buffer_Access_with_Incorrect_Length_Value"
-cat > "$SRC_ROOT/805_Buffer_Access_with_Incorrect_Length_Value/805_1.c" <<'EOF'
-#define WASM_PAGE_SIZE 0x10000
-
-extern unsigned char __heap_base[];
-extern void print_string(const char *s, int len);
-
-void start(void) {
-    unsigned char *heap = __heap_base;
-    int pages = __builtin_wasm_memory_size(0);
-    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
-
-    unsigned char *buf = heap + 64;
-    unsigned long real_len = 128;
-    unsigned long wrong_len = heap_len;  /* incorrect length */
-
-    for (unsigned long i = 0; i < wrong_len; i++) {
-        buf[i] = (unsigned char)(i & 0xff);
-    }
-
-    (void)real_len;
-
-    print_string("805_1 done\n", 11);
-}
-EOF
-
-########################
-# 806 – Buffer Access Using Size of Source Buffer
-########################
-mkdir -p "$SRC_ROOT/806_Buffer_Access_Using_Size_of_Source_Buffer"
-cat > "$SRC_ROOT/806_Buffer_Access_Using_Size_of_Source_Buffer/806_1.c" <<'EOF'
-#define WASM_PAGE_SIZE 0x10000
-
-extern unsigned char __heap_base[];
-extern void print_string(const char *s, int len);
-
-void start(void) {
-    unsigned char *heap = __heap_base;
-    int pages = __builtin_wasm_memory_size(0);
-    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
-
-    unsigned char *src = heap;
-    unsigned char *dst = heap + (heap_len / 2);
-
-    unsigned long src_size = heap_len;       /* full linear memory */
-    unsigned long dst_size = heap_len / 4;   /* smaller region */
-
-    for (unsigned long i = 0; i < src_size; i++) {
-        dst[i] = src[i];  /* uses src size, overruns dst */
-    }
-
-    (void)dst_size;
-
-    print_string("806_1 done\n", 11);
-}
-EOF
-
-########################
-# 823 – Use of Out-of-range Pointer Offset
-########################
-mkdir -p "$SRC_ROOT/823_Use_of_Out_of_range_Pointer_Offset"
-cat > "$SRC_ROOT/823_Use_of_Out_of_range_Pointer_Offset/823_1.c" <<'EOF'
-#define WASM_PAGE_SIZE 0x10000
-
-extern unsigned char __heap_base[];
-extern void print_string(const char *s, int len);
-
-volatile unsigned char sink;
-
-void start(void) {
-    unsigned char *heap = __heap_base;
-    int pages = __builtin_wasm_memory_size(0);
-    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
-
-    /* Base inside heap. */
-    unsigned char *base = heap + heap_len / 2;
-
-    /* Offset that walks beyond linear memory. */
-    long offset = (long)heap_len;
-
-    unsigned char *p = base + offset;  /* out-of-range pointer offset */
-
+    unsigned char *p = buf + buf_len + 128;  /* beyond allocated region and possibly linear mem */
     sink = *p;
+}'
 
-    print_string("823_1 done\n", 11);
-}
-EOF
+############################
+# 805 – Incorrect length
+############################
 
-echo "init_c.sh: generated all CWE benchmarks."
+write_c \
+  "805_Buffer_Access_with_Incorrect_Length_Value" \
+  "805_1.c" \
+'void start(void) {
+    unsigned char *heap = __heap_base;
+    int pages = __builtin_wasm_memory_size(0);
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
+
+    unsigned char *buf = heap + heap_len / 3;
+    unsigned long len = heap_len;  /* incorrect length relative to buf */
+
+    for (unsigned long i = 0; i < len; i++) {
+        buf[i] = (unsigned char)(i & 0xff);
+    }
+
+    print_int(buf[0]);
+}'
+
+############################
+# 806 – Using size of source buffer
+############################
+
+write_c \
+  "806_Buffer_Access_Using_Size_of_Source_Buffer" \
+  "806_1.c" \
+'void start(void) {
+    unsigned char *heap = __heap_base;
+    int pages = __builtin_wasm_memory_size(0);
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
+
+    unsigned char *src  = heap;
+    unsigned char *dest = heap + heap_len / 2;
+
+    unsigned long src_len = heap_len;
+    for (unsigned long i = 0; i < src_len; i++) {
+        dest[i] = src[i];  /* dest runs off end of linear memory */
+    }
+
+    print_int(dest[0]);
+}'
+
+############################
+# 823 – Out-of-range pointer offset
+############################
+
+write_c \
+  "823_Use_of_Out_of_range_Pointer_Offset" \
+  "823_1.c" \
+'volatile unsigned char sink;
+
+void start(void) {
+    unsigned char *heap = __heap_base;
+    int pages = __builtin_wasm_memory_size(0);
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
+
+    unsigned char *base = heap + heap_len / 2;
+    long offset = (long)heap_len;  /* push pointer beyond heap upper bound */
+
+    unsigned char *p = base + offset;
+    sink = *p;
+}'
+
+echo "init_c.sh: C benchmarks written under ${SRC_ROOT}"

@@ -1,24 +1,20 @@
-#define WASM_PAGE_SIZE 0x10000
+#define WASM_PAGE_SIZE 0x10000  /* 64 KiB */
 
 extern unsigned char __heap_base[];
-extern void print_string(const char *s, int len);
+extern void print_int(int);
 
 void start(void) {
     unsigned char *heap = __heap_base;
     int pages = __builtin_wasm_memory_size(0);
     unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    unsigned char *src = heap;
-    unsigned char *dst = heap + (heap_len / 2);
+    unsigned char *src  = heap;
+    unsigned char *dest = heap + heap_len / 2;
 
-    unsigned long src_size = heap_len;       /* full linear memory */
-    unsigned long dst_size = heap_len / 4;   /* smaller region */
-
-    for (unsigned long i = 0; i < src_size; i++) {
-        dst[i] = src[i];  /* uses src size, overruns dst */
+    unsigned long src_len = heap_len;
+    for (unsigned long i = 0; i < src_len; i++) {
+        dest[i] = src[i];  /* dest runs off end of linear memory */
     }
 
-    (void)dst_size;
-
-    print_string("806_1 done\n", 11);
+    print_int(dest[0]);
 }
