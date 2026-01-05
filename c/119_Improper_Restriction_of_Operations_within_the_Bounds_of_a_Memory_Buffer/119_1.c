@@ -1,40 +1,18 @@
-/* 119_2.c – CWE-119: Improper Restriction of Operations within the Bounds
- * of a Memory Buffer, using an address beyond Wasm linear memory.
- *
- * The program:
- *   - Queries the current Wasm memory size in pages.
- *   - Computes mem_bytes = pages * 64KB.
- *   - Treats that as a “valid” buffer limit, but then adds an extra offset.
- *   - Forms a pointer to address mem_bytes + 16, which is strictly past
- *     the end of linear memory [0 .. mem_bytes-1].
- *   - Dereferences that pointer once.
- *
- * On a correct Wasm engine, this must trap as an out-of-bounds access.
- * On CHERI+WARDuino (with a capability bounded to linear memory), the
- * dereference should also violate the capability bounds.
- */
+#define WASM_PAGE_SIZE 0x10000  /* 64 KiB */
 
-#define WASM_PAGE_SIZE 0x10000   /* 64KB – Wasm page size */
-
-extern void print_int(int);      /* provided by the host runtime */
-volatile unsigned char sink;     /* keep the load "live" */
+extern unsigned char __heap_base[];
+extern void print_int(int);
 
 void start(void) {
-    /* Number of pages in memory 0 */
+    unsigned char *heap = __heap_base;
     int pages = __builtin_wasm_memory_size(0);
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    /* Total linear memory size in bytes */
-    unsigned long mem_bytes = (unsigned long)pages * WASM_PAGE_SIZE;
+    print_int(pages);
+    print_int((int)heap);
 
-    /* Incorrectly assume we can safely go beyond mem_bytes */
-    unsigned long bad_addr = mem_bytes + 16;   /* beyond [0 .. mem_bytes-1] */
-
-    /* Fabricate a pointer to that out-of-bounds address */
-    unsigned char *p = (unsigned char *)bad_addr;
-
-    /* Single out-of-linear-memory access */
-    sink = *p;
-
-    /* Just to have some side effect if it ever "succeeds" (it should not) */
-    print_int((int)pages);
+    unsigned long len = heap_len + 16;
+    for (unsigned long i = 0; i < len; i++) {
+        heap[i] = (unsigned char)(i & 0xff);
+    }
 }

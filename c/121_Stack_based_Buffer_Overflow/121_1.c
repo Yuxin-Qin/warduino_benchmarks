@@ -1,18 +1,18 @@
-volatile int sink;
+#define WASM_PAGE_SIZE 0x10000  /* 64 KiB */
+
+extern unsigned char __heap_base[];
+extern void print_int(int);
 
 void start(void) {
-    int stack_buf[16];
-    int i;
+    unsigned char *heap = __heap_base;
+    int pages = __builtin_wasm_memory_size(0);
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    for (i = 0; i < 16; i++) {
-        stack_buf[i] = i;
+    unsigned char *stack_frame = heap + heap_len - 32;
+
+    for (int i = 0; i < 64; i++) {
+        stack_frame[i] = (unsigned char)i;  /* writes past end of linear memory */
     }
 
-    /* Stack-based overflow: write beyond end of stack_buf. */
-    for (i = 16; i < 32; i++) {
-        stack_buf[i] = i * 2;   /* out-of-bounds on stack */
-    }
-
-    sink = stack_buf[0];
+    print_int(stack_frame[0]);
 }
-

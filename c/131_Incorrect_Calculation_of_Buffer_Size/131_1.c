@@ -1,17 +1,18 @@
-volatile char sink;
+#define WASM_PAGE_SIZE 0x10000  /* 64 KiB */
+
+extern unsigned char __heap_base[];
+extern void print_int(int);
 
 void start(void) {
-    int n = 8;
-    char buf[8];
-    int i;
+    unsigned char *heap = __heap_base;
+    int pages = __builtin_wasm_memory_size(0);
 
-    /* Incorrectly using element count as byte count while assuming int-size. */
-    int bytes = n * (int)sizeof(int);  /* likely > 8 */
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
+    unsigned long buf_len  = heap_len + 256;  /* miscomputed size */
 
-    for (i = 0; i < bytes; i++) {
-        buf[i] = (char)i;   /* writes past buf[7] */
+    for (unsigned long i = 0; i < buf_len; i++) {
+        heap[i] = (unsigned char)(i & 0xff);
     }
 
-    sink = buf[0];
+    print_int(heap[0]);
 }
-

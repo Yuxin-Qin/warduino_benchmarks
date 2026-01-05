@@ -1,26 +1,19 @@
-volatile int sink;
-static int fake_heap[16];
+#define WASM_PAGE_SIZE 0x10000  /* 64 KiB */
 
-static int *my_alloc(int n) {
-    /* Very naive allocator returning base of fake_heap. */
-    (void)n;
-    return fake_heap;
-}
+extern unsigned char __heap_base[];
+extern void print_int(int);
 
 void start(void) {
-    int *p = my_alloc(16);
-    int i;
+    unsigned char *heap = __heap_base;
+    int pages = __builtin_wasm_memory_size(0);
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    /* Correct writes. */
-    for (i = 0; i < 16; i++) {
-        p[i] = i;
+    unsigned char *heap_obj = heap + heap_len / 4;
+    unsigned long obj_size = heap_len / 2;
+
+    for (unsigned long i = 0; i < obj_size + 128; i++) {
+        heap_obj[i] = (unsigned char)(i & 0xff);
     }
 
-    /* Heap-based overflow: write far beyond allocated 16 ints. */
-    for (i = 16; i < 40; i++) {
-        p[i] = i * 3;
-    }
-
-    sink = fake_heap[0];
+    print_int(heap_obj[0]);
 }
-

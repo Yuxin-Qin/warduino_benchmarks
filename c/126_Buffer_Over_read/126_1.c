@@ -1,17 +1,19 @@
-volatile int sink;
+#define WASM_PAGE_SIZE 0x10000  /* 64 KiB */
+
+extern unsigned char __heap_base[];
+extern void print_int(int);
+
+volatile unsigned char sink;
 
 void start(void) {
-    int src[16];
-    int i;
+    unsigned char *heap = __heap_base;
+    int pages = __builtin_wasm_memory_size(0);
+    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    for (i = 0; i < 16; i++) {
-        src[i] = i * 2;
-    }
+    unsigned char *buf = heap + heap_len / 2;
+    unsigned long len = heap_len / 2 + 64;
 
-    /* Over-read: read beyond src length. */
-    for (i = 0; i < 40; i++) {
-        int v = src[i];   /* out-of-bounds for i >= 16 */
-        sink = v;
+    for (unsigned long i = 0; i < len; i++) {
+        sink = buf[i];
     }
 }
-

@@ -1,18 +1,16 @@
-volatile int sink;
+#define WASM_PAGE_SIZE 0x10000  /* 64 KiB */
+
+extern unsigned char __heap_base[];
+extern void print_int(int);
+
+volatile unsigned char sink;
 
 void start(void) {
-    int buf[16];
-    int *p = &buf[8];
-    int i;
+    unsigned char *heap = __heap_base;
+    unsigned char *buf = heap + 128;
 
-    for (i = 0; i < 16; i++) {
-        buf[i] = i;
-    }
-
-    /* Under-read: for i < 8, we read before buf[0]. */
-    for (i = 0; i < 16; i++) {
-        int v = p[i - 8];  /* buf[-8]..buf[7] */
-        sink = v;
+    for (int i = -64; i < 0; i++) {
+        unsigned char *p = buf + i;  /* reads before start of buffer, may cross below heap */
+        sink = *p;
     }
 }
-
