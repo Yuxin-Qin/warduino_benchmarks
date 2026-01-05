@@ -1,19 +1,17 @@
-#define WASM_PAGE_SIZE 0x10000  /* 64 KiB */
+#define WASM_PAGE_SIZE 0x10000
 
 extern unsigned char __heap_base[];
-extern void print_int(int);
+extern void print_string(const char *s, int len);
 
 void start(void) {
     unsigned char *heap = __heap_base;
-    int pages = __builtin_wasm_memory_size(0);
-    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
+    unsigned char *buf  = heap + 128;
 
-    unsigned char *buf = heap + heap_len / 2;
-
-    for (int i = -64; i < 64; i++) {
-        unsigned char *p = buf + i;   /* for i<0, p < heap_base → underflow */
-        *p = (unsigned char)(i & 0xff);
+    /* Write before start of buffer; if heap == linear start this may
+       also cross below linear memory on small configs. */
+    for (int i = -256; i < 0; i++) {
+        buf[i] = (unsigned char)(i & 0xff);
     }
 
-    print_int(buf[0]);
+    print_string("124_1 done\n", 11);
 }

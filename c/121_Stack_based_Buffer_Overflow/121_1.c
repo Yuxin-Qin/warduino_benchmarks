@@ -1,18 +1,21 @@
-#define WASM_PAGE_SIZE 0x10000  /* 64 KiB */
+#define WASM_PAGE_SIZE 0x10000
 
 extern unsigned char __heap_base[];
-extern void print_int(int);
+extern void print_string(const char *s, int len);
 
 void start(void) {
     unsigned char *heap = __heap_base;
     int pages = __builtin_wasm_memory_size(0);
     unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
 
-    unsigned char *stack_frame = heap + heap_len - 32;
+    /* Treat top quarter of heap as "stack frame". */
+    unsigned char *frame = heap + (heap_len * 3) / 4;
+    unsigned long frame_size = heap_len / 8;
 
-    for (int i = 0; i < 64; i++) {
-        stack_frame[i] = (unsigned char)i;  /* writes past end of linear memory */
+    /* Overflow frame upward past end of memory. */
+    for (unsigned long i = 0; i < frame_size + 64; i++) {
+        frame[i] = (unsigned char)(i & 0xff);
     }
 
-    print_int(stack_frame[0]);
+    print_string("121_1 done\n", 11);
 }

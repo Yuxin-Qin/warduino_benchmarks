@@ -1,19 +1,27 @@
-#define WASM_PAGE_SIZE 0x10000  /* 64 KiB */
+#define WASM_PAGE_SIZE 0x10000
 
 extern unsigned char __heap_base[];
-extern void print_int(int);
+extern void print_string(const char *s, int len);
+
+static unsigned char *fake_heap = 0;
+static unsigned long fake_size  = 0;
+
+static unsigned char *my_malloc(unsigned long n) {
+    if (!fake_heap) {
+        fake_heap = __heap_base;
+        int pages = __builtin_wasm_memory_size(0);
+        fake_size = (unsigned long)pages * WASM_PAGE_SIZE;
+    }
+    return fake_heap; /* one big region */
+}
 
 void start(void) {
-    unsigned char *heap = __heap_base;
-    int pages = __builtin_wasm_memory_size(0);
-    unsigned long heap_len = (unsigned long)pages * WASM_PAGE_SIZE;
+    unsigned char *buf = my_malloc(64);
+    unsigned long n = fake_size + 32; /* overflow beyond allocated region */
 
-    unsigned char *heap_obj = heap + heap_len / 4;
-    unsigned long obj_size = heap_len / 2;
-
-    for (unsigned long i = 0; i < obj_size + 128; i++) {
-        heap_obj[i] = (unsigned char)(i & 0xff);
+    for (unsigned long i = 0; i < n; i++) {
+        buf[i] = (unsigned char)(i & 0xff);
     }
 
-    print_int(heap_obj[0]);
+    print_string("122_1 done\n", 11);
 }
