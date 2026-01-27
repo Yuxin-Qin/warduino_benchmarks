@@ -12,12 +12,12 @@ int start() {
   // Address one byte *before* heap
   unsigned char *bad = heap_base - 1;
 
+    // *** Heap underflow WRITE: single out-of-bounds store ***
+  *bad = 0x42;   // Only write, no read through 'bad'
+
   // Context prints (all in-bounds)
   print_int(num_pages);
   print_int((int)heap_base);
-
-  // *** Heap underflow WRITE: single out-of-bounds store ***
-  *bad = 0x42;   // Only write, no read through 'bad'
 
   return 0;
 }
