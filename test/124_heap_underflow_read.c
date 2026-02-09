@@ -4,6 +4,7 @@ extern unsigned char __heap_base[];
 
 int data[10];
 
+extern void print_int(int);
 
 // @entrypoint
 int start() {

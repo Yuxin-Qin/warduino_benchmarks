@@ -4,6 +4,8 @@ extern unsigned char __heap_base[]; /* linker initializes this value */
 
 int data[10];
 
+extern void print_int(int);
+
 
 // @entrypoint
 int start() {
