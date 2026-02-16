@@ -1,10 +1,10 @@
 #define WASM_PAGE_SIZE 0x10000   /* 64KB, from WARDuino.h */
 
 extern unsigned char __heap_base[];
+extern void print_int(int);
 
 int data[10];
 
-extern void print_int(int);
 
 // @entrypoint
 int start() {
@@ -21,4 +21,3 @@ int start() {
   print_int((int)(*heap_base));
   return 0;
 }
-    
