@@ -19,7 +19,7 @@ int start(void) {
       (unsigned char *)0 + (unsigned long)num_pages * WASM_PAGE_SIZE;
 
   /* Optional: do a few in-bounds heap writes, still write-only */
-  for (int i = 0; i < 16; i++) {
+  for (int i = 0; i < 160; i++) {
     heap_base[i] = (unsigned char)i;   /* in-bounds writes */
   }
 

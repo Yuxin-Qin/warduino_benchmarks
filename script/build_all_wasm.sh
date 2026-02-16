@@ -3,8 +3,8 @@ set -euo pipefail
 
 # Root paths (repo root = parent of this script)
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd)"
-SRC_ROOT="$ROOT_DIR/c"
-WASM_ROOT="$ROOT_DIR/wasm"
+SRC_ROOT="$ROOT_DIR/test"
+WASM_ROOT="$ROOT_DIR/test"
 
 mkdir -p "$WASM_ROOT"
 
