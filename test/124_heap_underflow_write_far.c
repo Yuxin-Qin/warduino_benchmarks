@@ -10,7 +10,7 @@ int start() {
   unsigned char *heap_base = __heap_base;
 
   // Address one byte *before* heap
-  unsigned char *bad = heap_base - 100; //-1 for short underflow
+  unsigned char *bad = heap_base - (16 * WASM_PAGE_SIZE);  // 1MB underflow //-1 for short underflow
 
     // *** Heap underflow WRITE: single out-of-bounds store ***
   *bad = 0x42;   // Only write, no read through 'bad'
