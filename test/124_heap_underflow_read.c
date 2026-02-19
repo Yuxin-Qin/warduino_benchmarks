@@ -2,7 +2,7 @@
 
 extern unsigned char __heap_base[];
 extern void print_int(int);
-extern void print_cap(int);
+extern void print_cap(void *cap);
 
 int data[10];
 
@@ -18,6 +18,7 @@ int start() {
   print_int((int)heap_base);
   print_int((int)(heap_base[0]));
   // heap_base +=(WASM_PAGE_SIZE*num_pages);
+  print_cap((heap_base));
   heap_base--;
   print_int((int)(*heap_base));
   return 0;
