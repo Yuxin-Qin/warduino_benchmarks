@@ -17,7 +17,9 @@ int start() {
   print_int((int)heap_base);
   print_int((int)(heap_base[0]));
   // heap_base +=(WASM_PAGE_SIZE*num_pages);
-  heap_base = heap_base - 100;
+  heap_base = heap_base - 0x0bb899;
+  print_int((int)(*heap_base));
+  heap_base = heap_base - 0x100000;
   print_int((int)(*heap_base));
   return 0;
 }
